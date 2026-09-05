@@ -13,7 +13,8 @@
     "dist": "electron-builder --win"
   },
   "dependencies": {
-    "minecraft-launcher-core": "^3.2.0"
+    "minecraft-launcher-core": "^3.2.0",
+    "adm-zip": "^0.5.16"
   },
   "devDependencies": {
     "electron": "^38.1.0",
