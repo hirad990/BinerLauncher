@@ -11,14 +11,9 @@
   <div class="app-shell">
     <div class="topbar">
       <div class="brand"><span class="brand-mark">B</span><div><strong>BINER</strong><small>LAUNCHER</small></div></div>
-      <div class="server-pill"><span class="dot"></span><span id="onlineCount">180</span> بازیکن آنلاین</div>
-      <div class="window-actions">
-        <button id="minimize" aria-label="Minimize">—</button>
-        <button id="maximize" aria-label="Maximize">□</button>
-        <button id="close" class="close" aria-label="Close">×</button>
-      </div>
+      <div class="server-pill"><span class="dot"></span><span id="onlineCount">BinerCraft</span></div>
+      <div class="window-actions"><button id="minimize" aria-label="Minimize">—</button><button id="maximize" aria-label="Maximize">□</button><button id="close" class="close" aria-label="Close">×</button></div>
     </div>
-
     <aside class="sidebar">
       <nav>
         <button class="nav-item active" data-section="home"><span>⌂</span> خانه</button>
@@ -26,44 +21,24 @@
         <button class="nav-item" data-section="news"><span>◉</span> اخبار</button>
         <button class="nav-item" data-section="settings"><span>⚙</span> تنظیمات</button>
       </nav>
-      <div class="account-card">
-        <div class="avatar">H</div>
-        <div class="account-info"><strong id="username">بازیکن مهمان</strong><small id="accountStatus">حساب محلی</small></div>
-        <button id="accountBtn">›</button>
-      </div>
+      <div class="account-card"><div class="avatar" id="avatar">G</div><div class="account-info"><strong id="username">بازیکن مهمان</strong><small id="accountStatus">حساب محلی</small></div><button id="accountBtn">›</button></div>
     </aside>
-
     <main class="content">
       <section id="home" class="section active-section">
         <div class="hero-copy">
           <div class="eyebrow"><span></span> BinerCraft Network</div>
           <h1>وقتشه وارد<br><em>دنیای باینر</em> بشی.</h1>
-          <p>لانچر رسمی BinerCraft برای مدیریت نسخه‌ها، اجرای سریع بازی و دسترسی مستقیم به شبکه.</p>
+          <p>لانچر واقعی BinerCraft؛ حساب محلی، دانلود خودکار فایل‌های Minecraft، مدیریت نسخه و اجرای مستقیم بازی.</p>
           <div class="hero-actions"><button class="primary" id="playBtn"><span>▶</span> اجرای Minecraft</button><button class="ghost" id="storeBtn">فروشگاه BinerCraft ↗</button></div>
-          <div class="quick-stats"><div><strong>1.21.11</strong><small>نسخه پیشنهادی</small></div><div><strong>24/7</strong><small>سرور آنلاین</small></div><div><strong>∞</strong><small>پروفایل و نسخه</small></div></div>
+          <div class="quick-stats"><div><strong id="selectedVersionLabel">1.21.11</strong><small>نسخه انتخاب‌شده</small></div><div><strong>LOCAL</strong><small>نوع حساب</small></div><div><strong id="memoryLabel">4096 MB</strong><small>حافظه بازی</small></div></div>
         </div>
-        <div class="launcher-preview">
-          <div class="preview-glow"></div>
-          <div class="mc-scene"><div class="mountain m1"></div><div class="mountain m2"></div><div class="moon"></div><div class="ground"></div></div>
-          <div class="preview-window">
-            <div class="preview-head"><span>BINER LAUNCHER</span><i></i></div>
-            <div class="preview-title">انتخاب نسخه</div>
-            <div class="version-grid">
-              <button class="version-card selected"><b>1.21</b><small>RECOMMENDED</small></button>
-              <button class="version-card"><b>1.20</b><small>STABLE</small></button>
-              <button class="version-card"><b>1.19</b><small>STABLE</small></button>
-              <button class="version-card"><b>1.18</b><small>LEGACY</small></button>
-            </div>
-            <div class="preview-bottom"><span>Java 21 • 4096 MB</span><button>▶ PLAY</button></div>
-          </div>
-        </div>
+        <div class="launcher-preview"><div class="preview-glow"></div><div class="mc-scene"><div class="mountain m1"></div><div class="mountain m2"></div><div class="moon"></div><div class="ground"></div></div><div class="preview-window"><div class="preview-head"><span>BINER LAUNCHER • LOCAL</span><i></i></div><div class="preview-title">انتخاب نسخه</div><div class="version-grid"><button class="version-card selected" data-version="1.21.11"><b>1.21.11</b><small>RECOMMENDED</small></button><button class="version-card" data-version="1.21.10"><b>1.21.10</b><small>STABLE</small></button><button class="version-card" data-version="1.21.8"><b>1.21.8</b><small>STABLE</small></button><button class="version-card" data-version="1.20.6"><b>1.20.6</b><small>LEGACY</small></button></div><div class="preview-bottom"><span>Java • <span id="previewMemory">4096 MB</span></span><button id="previewPlay">▶ PLAY</button></div></div></div>
       </section>
-
-      <section id="versions" class="section hidden-section"><div class="section-heading"><span>LIBRARY</span><h2>نسخه‌های Minecraft</h2><p>نسخه موردنظر خودت را انتخاب و مدیریت کن.</p></div><div class="library-grid"><article class="library-card featured"><span>پیشنهاد باینر</span><h3>1.21.11</h3><p>Latest • Fabric / Vanilla</p><button class="primary">انتخاب نسخه</button></article><article class="library-card"><h3>1.21.x</h3><p>Stable releases</p><button class="ghost">مدیریت</button></article><article class="library-card"><h3>1.20.x</h3><p>Stable releases</p><button class="ghost">مدیریت</button></article></div></section>
-      <section id="news" class="section hidden-section"><div class="section-heading"><span>BINER NEWS</span><h2>آخرین اخبار</h2><p>اخبار و رویدادهای BinerCraft را از همین‌جا دنبال کن.</p></div><div class="news-card"><div class="news-icon">BC</div><div><small>BINERCRAFT</small><h3>به زودی؛ نسخه اول لانچر رسمی باینر</h3><p>در حال آماده‌سازی تجربه‌ای سریع، سبک و حرفه‌ای برای بازیکنان BinerCraft هستیم.</p></div></div></section>
-      <section id="settings" class="section hidden-section"><div class="section-heading"><span>CONFIGURATION</span><h2>تنظیمات لانچر</h2><p>تنظیمات ظاهری و اجرای بازی در یک مکان.</p></div><div class="settings-card"><label>نام بازیکن<input id="nameInput" value="بازیکن مهمان" /></label><label>حافظه اختصاص‌یافته<select><option>2048 MB</option><option selected>4096 MB</option><option>6144 MB</option><option>8192 MB</option></select></label><label class="toggle-row">اجرای خودکار لانچر <input type="checkbox" checked /></label><button class="primary" id="saveSettings">ذخیره تنظیمات</button></div></section>
+      <section id="versions" class="section hidden-section"><div class="section-heading"><span>LIBRARY</span><h2>نسخه‌های Minecraft</h2><p>با انتخاب نسخه، اولین اجرا فایل‌های رسمی همان نسخه را خودکار دریافت می‌کند.</p></div><div class="library-grid"><article class="library-card featured"><span>پیشنهاد باینر</span><h3>1.21.11</h3><p>Vanilla Release • نصب خودکار</p><button class="primary version-select" data-version="1.21.11">انتخاب نسخه</button></article><article class="library-card"><h3>1.21.10</h3><p>Stable Release</p><button class="ghost version-select" data-version="1.21.10">انتخاب</button></article><article class="library-card"><h3>1.20.6</h3><p>Legacy Release</p><button class="ghost version-select" data-version="1.20.6">انتخاب</button></article></div></section>
+      <section id="news" class="section hidden-section"><div class="section-heading"><span>BINER NEWS</span><h2>آخرین اخبار</h2><p>لانچر در حال تبدیل شدن به مرکز کامل تجربه BinerCraft است.</p></div><div class="news-card"><div class="news-icon">BC</div><div><small>BINERCRAFT</small><h3>هسته واقعی لانچر فعال شد</h3><p>حساب Local، ذخیره تنظیمات و اجرای واقعی Minecraft به هسته لانچر اضافه شده است.</p></div></div></section>
+      <section id="settings" class="section hidden-section"><div class="section-heading"><span>CONFIGURATION</span><h2>تنظیمات لانچر</h2><p>اطلاعات محلی شما روی همین سیستم ذخیره می‌شود.</p></div><div class="settings-card"><label>نام بازیکن<input id="nameInput" maxlength="16" value="بازیکن مهمان" /></label><label>حافظه اختصاص‌یافته<select id="memoryInput"><option value="2048">2048 MB</option><option value="4096" selected>4096 MB</option><option value="6144">6144 MB</option><option value="8192">8192 MB</option></select></label><label>آدرس سرور<input id="serverInput" value="Play.BinerCraft.ir" /></label><label>پورت سرور<input id="portInput" type="number" min="1" max="65535" value="25565" /></label><button class="primary" id="saveSettings">ذخیره تنظیمات</button></div></section>
     </main>
-
+    <div class="modal hidden" id="accountModal"><div class="modal-card"><button class="modal-close" id="accountClose">×</button><div class="eyebrow">LOCAL ACCOUNT</div><h2>ورود محلی</h2><p>برای شروع بازی یک نام کاربری محلی انتخاب کن. هیچ رمز عبوری لازم نیست.</p><input id="localNameInput" maxlength="16" placeholder="نام بازیکن" /><button class="primary" id="localLogin">ورود به حساب محلی</button></div></div>
     <div class="toast" id="toast"></div>
   </div>
   <script src="./app.js"></script>
