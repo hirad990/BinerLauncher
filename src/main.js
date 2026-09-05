@@ -3,9 +3,11 @@ const path = require('path')
 const fs = require('fs')
 const crypto = require('crypto')
 const { Client } = require('minecraft-launcher-core')
+const { ensureJava } = require('./java-manager')
 
 const isDev = !app.isPackaged
 let launcherProcess = null
+let mainWindow = null
 
 function dataPath() { return path.join(app.getPath('userData'), 'profile.json') }
 function readProfile() {
@@ -16,28 +18,18 @@ function writeProfile(profile) {
   fs.writeFileSync(dataPath(), JSON.stringify(profile, null, 2), 'utf8')
   return profile
 }
-function findJava() {
-  const candidates = []
-  if (process.env.JAVA_HOME) candidates.push(path.join(process.env.JAVA_HOME, 'bin', process.platform === 'win32' ? 'java.exe' : 'java'))
-  if (process.platform === 'win32') {
-    candidates.push('C:\\Program Files\\Java\\jdk-21\\bin\\java.exe')
-    candidates.push('C:\\Program Files\\Java\\jdk-17\\bin\\java.exe')
-    candidates.push('C:\\Program Files\\Eclipse Adoptium\\jdk-21\\bin\\java.exe')
-  }
-  for (const p of candidates) if (fs.existsSync(p)) return p
-  return process.platform === 'win32' ? 'java.exe' : 'java'
-}
 function offlineUuid(username) {
   const hex = crypto.createHash('md5').update(`OfflinePlayer:${username}`).digest('hex')
   return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`
 }
 function createWindow() {
-  const win = new BrowserWindow({ width: 1440, height: 900, minWidth: 1100, minHeight: 700, frame: false, backgroundColor: '#070b14', show: false,
+  mainWindow = new BrowserWindow({ width: 1440, height: 900, minWidth: 1100, minHeight: 700, frame: false, backgroundColor: '#070b14', show: false,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true } })
-  win.loadFile(path.join(__dirname, 'renderer', 'index.html'))
-  win.once('ready-to-show', () => win.show())
-  if (isDev) win.webContents.openDevTools({ mode: 'detach' })
+  mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'))
+  mainWindow.once('ready-to-show', () => mainWindow.show())
+  if (isDev) mainWindow.webContents.openDevTools({ mode: 'detach' })
 }
+
 async function launchMinecraft({ username, version, memory, serverHost, serverPort }) {
   if (launcherProcess) throw new Error('Minecraft is already running.')
   username = String(username || '').trim()
@@ -45,13 +37,20 @@ async function launchMinecraft({ username, version, memory, serverHost, serverPo
   version = String(version || '1.21.11')
   const root = path.join(app.getPath('userData'), 'minecraft')
   const maxMemory = Math.max(1024, Number(memory) || 4096)
+
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('java:status', { stage: 'checking', progress: 0, message: 'در حال بررسی Java...' })
+  const java = await ensureJava(app.getPath('userData'), (progress, received, total) => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('java:status', { stage: 'downloading', progress, received, total, message: `در حال نصب Java... ${progress}%` })
+  })
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('java:status', { stage: 'ready', progress: 100, version: java.version, message: `Java ${java.version} آماده است.` })
+
   const uuid = offlineUuid(username)
   const authorization = { access_token: '0', client_token: uuid.replaceAll('-', ''), uuid, name: username }
   const options = {
     authorization, root,
     version: { number: version, type: 'release' },
     memory: { max: `${maxMemory}M`, min: '1024M' },
-    javaPath: findJava()
+    javaPath: java.path
   }
   if (serverHost) options.server = { host: String(serverHost), port: Number(serverPort) || 25565 }
   const launcher = new Client()
@@ -64,10 +63,11 @@ async function launchMinecraft({ username, version, memory, serverHost, serverPo
     launcher.on('close', code => { launcherProcess = null; console.log('[Minecraft] exited', code) })
     launcherProcess = launcher
     launcher.launch(options)
-      .then(() => { started = true; resolve({ ok: true, root, version }) })
+      .then(() => { started = true; resolve({ ok: true, root, version, javaVersion: java.version }) })
       .catch(error => { launcherProcess = null; reject(error) })
   })
 }
+
 app.whenReady().then(() => {
   createWindow()
   ipcMain.on('window:minimize', event => BrowserWindow.fromWebContents(event.sender)?.minimize())
