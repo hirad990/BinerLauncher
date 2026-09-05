@@ -1,46 +1,20 @@
 const $ = s => document.querySelector(s)
 const $$ = s => [...document.querySelectorAll(s)]
-
-function toast(message) {
-  const el = $('#toast')
-  el.textContent = message
-  el.classList.add('show')
-  clearTimeout(window.__toastTimer)
-  window.__toastTimer = setTimeout(() => el.classList.remove('show'), 2600)
-}
-
-$$('.nav-item').forEach(btn => btn.addEventListener('click', () => {
-  $$('.nav-item').forEach(x => x.classList.remove('active'))
-  btn.classList.add('active')
-  $$('.section').forEach(x => { x.classList.remove('active-section'); x.classList.add('hidden-section') })
-  const section = $('#' + btn.dataset.section)
-  section.classList.remove('hidden-section')
-  section.classList.add('active-section')
-}))
-
-$$('.version-card').forEach(card => card.addEventListener('click', () => {
-  $$('.version-card').forEach(x => x.classList.remove('selected'))
-  card.classList.add('selected')
-  toast(`نسخه ${card.querySelector('b').textContent} انتخاب شد`)
-}))
-
-$('#playBtn').addEventListener('click', () => toast('سیستم اجرای Minecraft در مرحله بعد فعال می‌شود 🚀'))
+let state = { username: '', version: '1.21.11', memory: 4096, serverHost: 'Play.BinerCraft.ir', serverPort: 25565 }
+function toast(message) { const el = $('#toast'); el.textContent = message; el.classList.add('show'); clearTimeout(window.__toastTimer); window.__toastTimer = setTimeout(() => el.classList.remove('show'), 3000) }
+function setSection(name) { $$('.nav-item').forEach(x => x.classList.toggle('active', x.dataset.section === name)); $$('.section').forEach(x => { x.classList.toggle('active-section', x.id === name); x.classList.toggle('hidden-section', x.id !== name) }) }
+function render() { const name = state.username || 'بازیکن مهمان'; $('#username').textContent = name; $('#avatar').textContent = name[0]?.toUpperCase() || 'G'; $('#accountStatus').textContent = state.username ? 'حساب محلی • آماده اجرا' : 'حساب محلی • وارد نشده'; $('#nameInput').value = name; $('#localNameInput').value = state.username; $('#memoryInput').value = String(state.memory); $('#serverInput').value = state.serverHost; $('#portInput').value = String(state.serverPort); $('#memoryLabel').textContent = `${state.memory} MB`; $('#previewMemory').textContent = `${state.memory} MB`; $('#selectedVersionLabel').textContent = state.version; $$('.version-card').forEach(x => x.classList.toggle('selected', x.dataset.version === state.version)) }
+async function save() { state = { username: $('#nameInput').value.trim(), memory: Number($('#memoryInput').value), version: state.version, serverHost: $('#serverInput').value.trim(), serverPort: Number($('#portInput').value) || 25565 }; if (!state.username) state.username = ''; await window.biner.saveProfile(state); render(); toast('تنظیمات روی سیستم ذخیره شد ✓') }
+async function launch() { if (!state.username) { $('#accountModal').classList.remove('hidden'); $('#localNameInput').focus(); return } const button = $('#playBtn'); button.disabled = true; button.innerHTML = '⏳ در حال آماده‌سازی...'; toast(`در حال آماده‌سازی Minecraft ${state.version}؛ دانلود فایل‌ها ممکن است زمان ببرد...`); try { await window.biner.saveProfile(state); await window.biner.launchMinecraft({ username: state.username, version: state.version, memory: state.memory, serverHost: state.serverHost, serverPort: state.serverPort }); toast('Minecraft اجرا شد 🚀') } catch (error) { toast(`خطا: ${error?.message || error}`) } finally { button.disabled = false; button.innerHTML = '<span>▶</span> اجرای Minecraft' } }
+$$('.nav-item').forEach(btn => btn.addEventListener('click', () => setSection(btn.dataset.section)))
+$$('.version-card, .version-select').forEach(card => card.addEventListener('click', async () => { state.version = card.dataset.version; render(); await window.biner.saveProfile(state); toast(`نسخه ${state.version} انتخاب شد`) }))
+$('#playBtn').addEventListener('click', launch); $('#previewPlay').addEventListener('click', launch)
 $('#storeBtn').addEventListener('click', () => window.biner?.openExternal('https://binercraft.ir'))
-$('#accountBtn').addEventListener('click', () => toast('سیستم حساب Microsoft و Local به‌زودی اضافه می‌شود'))
-$('#saveSettings').addEventListener('click', () => {
-  const name = $('#nameInput').value.trim() || 'بازیکن مهمان'
-  $('#username').textContent = name
-  localStorage.setItem('biner_username', name)
-  toast('تنظیمات با موفقیت ذخیره شد ✓')
-})
-
-const savedName = localStorage.getItem('biner_username')
-if (savedName) { $('#nameInput').value = savedName; $('#username').textContent = savedName }
-
-$('#minimize').addEventListener('click', () => window.biner?.window.minimize())
-$('#maximize').addEventListener('click', () => window.biner?.window.maximize())
-$('#close').addEventListener('click', () => window.biner?.window.close())
-
-window.biner?.appVersion().then(v => {
-  document.title = `Biner Launcher v${v}`
-}).catch(() => {})
+$('#accountBtn').addEventListener('click', () => { $('#accountModal').classList.remove('hidden'); $('#localNameInput').focus() })
+$('#accountClose').addEventListener('click', () => $('#accountModal').classList.add('hidden'))
+$('#localLogin').addEventListener('click', async () => { const username = $('#localNameInput').value.trim(); if (!/^[A-Za-z0-9_]{3,16}$/.test(username)) { toast('نام باید 3 تا 16 کاراکتر و فقط شامل حروف انگلیسی، عدد یا _ باشد.'); return } state.username = username; await window.biner.saveProfile(state); $('#accountModal').classList.add('hidden'); render(); toast(`ورود محلی با نام ${username} انجام شد ✓`) })
+$('#saveSettings').addEventListener('click', save)
+$('#nameInput').addEventListener('change', () => { state.username = $('#nameInput').value.trim(); render() })
+$('#minimize').addEventListener('click', () => window.biner?.window.minimize()); $('#maximize').addEventListener('click', () => window.biner?.window.maximize()); $('#close').addEventListener('click', () => window.biner?.window.close())
+window.biner?.appVersion().then(v => { document.title = `Biner Launcher v${v}` }).catch(() => {})
+window.biner?.getProfile().then(profile => { if (profile) state = { ...state, ...profile }; render() }).catch(() => render())
