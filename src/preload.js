@@ -13,7 +13,12 @@ contextBridge.exposeInMainWorld('biner', {
   folders: () => ipcRenderer.invoke('minecraft:folders'),
   launchMinecraft: options => ipcRenderer.invoke('minecraft:launch', options),
   minecraftStatus: () => ipcRenderer.invoke('minecraft:status'),
+  serverStatus: options => ipcRenderer.invoke('server:status', options),
+  checkForUpdates: () => ipcRenderer.invoke('app:check-updates'),
+  getCrashReports: () => ipcRenderer.invoke('app:crash-reports'),
+  openCrashReports: () => ipcRenderer.invoke('app:open-crash-reports'),
   onProgress: callback => ipcRenderer.on('launcher:progress', (_, data) => callback(data)),
   onLog: callback => ipcRenderer.on('launcher:log', (_, data) => callback(data)),
+  onCrash: callback => ipcRenderer.on('launcher:crash', (_, data) => callback(data)),
   window: { minimize: () => ipcRenderer.send('window:minimize'), maximize: () => ipcRenderer.send('window:maximize'), close: () => ipcRenderer.send('window:close') }
 })
