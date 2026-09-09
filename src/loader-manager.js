@@ -1,108 +1,20 @@
 const fs = require('fs')
 const path = require('path')
 const { spawn } = require('child_process')
+const UA = 'BinerLauncher/0.4.0'
 
-const UA = 'BinerLauncher/0.3.1'
-
-async function json(url) {
-  const res = await fetch(url, { headers: { 'User-Agent': UA } })
-  if (!res.ok) throw new Error(`HTTP ${res.status} while requesting ${url}`)
-  return res.json()
-}
-
+async function json(url) { const res = await fetch(url, { headers: { 'User-Agent': UA } }); if (!res.ok) throw new Error(`HTTP ${res.status} while requesting ${url}`); return res.json() }
 async function download(url, target, onProgress = () => {}) {
-  const res = await fetch(url, { headers: { 'User-Agent': UA } })
-  if (!res.ok) throw new Error(`HTTP ${res.status} while downloading ${url}`)
-  if (!res.body) throw new Error('Download stream unavailable.')
-  fs.mkdirSync(path.dirname(target), { recursive: true })
-  const total = Number(res.headers.get('content-length')) || 0
-  const temp = `${target}.part`
-  const file = fs.createWriteStream(temp)
-  let received = 0
-  try {
-    for await (const chunk of res.body) {
-      received += chunk.length
-      if (!file.write(chunk)) await new Promise(resolve => file.once('drain', resolve))
-      onProgress(total ? Math.round(received / total * 100) : 0, received, total)
-    }
-    await new Promise((resolve, reject) => file.end(error => error ? reject(error) : resolve()))
-    fs.renameSync(temp, target)
-  } catch (e) {
-    file.destroy()
-    try { fs.rmSync(temp, { force: true }) } catch {}
-    throw e
-  }
+  const res = await fetch(url, { headers: { 'User-Agent': UA } }); if (!res.ok) throw new Error(`HTTP ${res.status} while downloading ${url}`); if (!res.body) throw new Error('Download stream unavailable.')
+  fs.mkdirSync(path.dirname(target), { recursive: true }); const total = Number(res.headers.get('content-length')) || 0; const temp = `${target}.part`; const file = fs.createWriteStream(temp); let received = 0
+  try { for await (const chunk of res.body) { received += chunk.length; if (!file.write(chunk)) await new Promise(resolve => file.once('drain', resolve)); onProgress(total ? Math.round(received / total * 100) : 0, received, total) }; await new Promise((resolve, reject) => file.end(error => error ? reject(error) : resolve())); fs.renameSync(temp, target) } catch (e) { file.destroy(); try { fs.rmSync(temp, { force: true }) } catch {}; throw e }
 }
+function runJava(javaPath, args, cwd) { return new Promise((resolve, reject) => { const child = spawn(javaPath, args, { cwd, windowsHide: true }); let stderr = ''; child.stdout?.on('data', d => console.log('[Loader]', d.toString())); child.stderr?.on('data', d => { stderr += d.toString(); console.error('[Loader]', d.toString()) }); child.on('error', reject); child.on('close', code => code === 0 ? resolve() : reject(new Error(stderr.trim() || `Installer exited with code ${code}`))) }) }
 
-function runJava(javaPath, args, cwd) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(javaPath, args, { cwd, windowsHide: true })
-    let stderr = ''
-    child.stdout?.on('data', d => console.log('[Loader]', d.toString()))
-    child.stderr?.on('data', d => { stderr += d.toString(); console.error('[Loader]', d.toString()) })
-    child.on('error', reject)
-    child.on('close', code => code === 0 ? resolve() : reject(new Error(stderr.trim() || `Installer exited with code ${code}`)))
-  })
-}
-
-async function installFabric({ root, minecraftVersion, javaPath, onProgress = () => {} }) {
-  const versions = await json(`https://meta.fabricmc.net/v2/versions/loader/${encodeURIComponent(minecraftVersion)}`)
-  const stable = versions.find(v => v.loader?.stable) || versions[0]
-  if (!stable) throw new Error(`Fabric برای Minecraft ${minecraftVersion} پیدا نشد.`)
-  const loaderVersion = stable.loader.version
-  const profileId = `${minecraftVersion}-fabric-${loaderVersion}`
-  const profileUrl = `https://meta.fabricmc.net/v2/versions/loader/${encodeURIComponent(minecraftVersion)}/${encodeURIComponent(loaderVersion)}/profile/json`
-  const profile = await json(profileUrl)
-  const dir = path.join(root, 'versions', profileId)
-  fs.mkdirSync(dir, { recursive: true })
-  fs.writeFileSync(path.join(dir, `${profileId}.json`), JSON.stringify({ ...profile, id: profileId }, null, 2), 'utf8')
-  onProgress(100, 1, 1)
-  return { loader: 'fabric', loaderVersion, profileId }
-}
-
-async function installForge({ root, minecraftVersion, javaPath, onProgress = () => {} }) {
-  const promos = await json('https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json')
-  const forgeVersion = promos.promos?.[`${minecraftVersion}-recommended`] || promos.promos?.[`${minecraftVersion}-latest`]
-  if (!forgeVersion) throw new Error(`Forge برای Minecraft ${minecraftVersion} پیدا نشد.`)
-  const installerUrl = `https://maven.minecraftforge.net/net/minecraftforge/forge/${minecraftVersion}-${forgeVersion}/forge-${minecraftVersion}-${forgeVersion}-installer.jar`
-  const cache = path.join(root, 'cache')
-  const installer = path.join(cache, `forge-${minecraftVersion}-${forgeVersion}-installer.jar`)
-  if (!fs.existsSync(installer)) await download(installerUrl, installer, onProgress)
-  await runJava(javaPath, ['-jar', installer, '--installClient', root], root)
-  return { loader: 'forge', loaderVersion: forgeVersion, profileId: `forge-${minecraftVersion}-${forgeVersion}` }
-}
-
-function neoChannelForMinecraft(version) {
-  const m = String(version).match(/^1\.(\d+)(?:\.(\d+))?$/)
-  if (!m) return null
-  const minor = Number(m[1])
-  const patch = Number(m[2] || 0)
-  // NeoForge versions mirror Minecraft 1.21.x as 21.x.y.
-  // Example: MC 1.21.1 -> NeoForge 21.1.x; MC 1.21.11 -> 21.11.x.
-  if (minor !== 21) return null
-  return patch ? `21.${patch}` : '21.0'
-}
-
-async function installNeoForge({ root, minecraftVersion, javaPath, onProgress = () => {} }) {
-  const versionMap = await json('https://maven.neoforged.net/api/maven/details/releases/net/neoforged/neoforge')
-  const versions = (versionMap?.versions || []).map(String)
-  if (!versions.length) throw new Error('فهرست نسخه‌های NeoForge در دسترس نیست.')
-  const channel = neoChannelForMinecraft(minecraftVersion)
-  const candidates = channel ? versions.filter(v => v === channel || v.startsWith(`${channel}.`)) : []
-  const neoVersion = candidates.sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).pop()
-  if (!neoVersion) throw new Error(`NeoForge سازگار با Minecraft ${minecraftVersion} پیدا نشد.`)
-  const url = `https://maven.neoforged.net/releases/net/neoforged/neoforge/${neoVersion}/neoforge-${neoVersion}-installer.jar`
-  const cache = path.join(root, 'cache')
-  const installer = path.join(cache, `neoforge-${neoVersion}-installer.jar`)
-  if (!fs.existsSync(installer)) await download(url, installer, onProgress)
-  await runJava(javaPath, ['-jar', installer, '--install-client', root], root)
-  return { loader: 'neoforge', loaderVersion: neoVersion, profileId: `neoforge-${neoVersion}` }
-}
-
-function listInstalled(root) {
-  const dir = path.join(root, 'versions')
-  if (!fs.existsSync(dir)) return []
-  return fs.readdirSync(dir, { withFileTypes: true }).filter(x => x.isDirectory()).map(x => x.name)
-}
-
-module.exports = { installFabric, installForge, installNeoForge, listInstalled, download }
+async function installFabric({ root, minecraftVersion, javaPath, onProgress = () => {} }) { const versions = await json(`https://meta.fabricmc.net/v2/versions/loader/${encodeURIComponent(minecraftVersion)}`); const stable = versions.find(v => v.loader?.stable) || versions[0]; if (!stable) throw new Error(`Fabric برای Minecraft ${minecraftVersion} پیدا نشد.`); const loaderVersion = stable.loader.version; const profileId = `${minecraftVersion}-fabric-${loaderVersion}`; const profile = await json(`https://meta.fabricmc.net/v2/versions/loader/${encodeURIComponent(minecraftVersion)}/${encodeURIComponent(loaderVersion)}/profile/json`); const dir = path.join(root, 'versions', profileId); fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, `${profileId}.json`), JSON.stringify({ ...profile, id: profileId }, null, 2), 'utf8'); onProgress(100, 1, 1); return { loader: 'fabric', loaderVersion, profileId } }
+async function installForge({ root, minecraftVersion, javaPath, onProgress = () => {} }) { const promos = await json('https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json'); const forgeVersion = promos.promos?.[`${minecraftVersion}-recommended`] || promos.promos?.[`${minecraftVersion}-latest`]; if (!forgeVersion) throw new Error(`Forge برای Minecraft ${minecraftVersion} پیدا نشد.`); const installerUrl = `https://maven.minecraftforge.net/net/minecraftforge/forge/${minecraftVersion}-${forgeVersion}/forge-${minecraftVersion}-${forgeVersion}-installer.jar`; const installer = path.join(root, 'cache', `forge-${minecraftVersion}-${forgeVersion}-installer.jar`); if (!fs.existsSync(installer)) await download(installerUrl, installer, onProgress); await runJava(javaPath, ['-jar', installer, '--installClient', root], root); return { loader: 'forge', loaderVersion: forgeVersion, profileId: `forge-${minecraftVersion}-${forgeVersion}` } }
+function neoChannelForMinecraft(version) { const m = String(version).match(/^1\.(\d+)(?:\.(\d+))?$/); if (!m) return null; const minor = Number(m[1]); const patch = Number(m[2] || 0); if (minor !== 21) return null; return patch ? `21.${patch}` : '21.0' }
+async function installNeoForge({ root, minecraftVersion, javaPath, onProgress = () => {} }) { const versionMap = await json('https://maven.neoforged.net/api/maven/details/releases/net/neoforged/neoforge'); const versions = (versionMap?.versions || []).map(String); const channel = neoChannelForMinecraft(minecraftVersion); const candidates = channel ? versions.filter(v => v === channel || v.startsWith(`${channel}.`)) : []; const neoVersion = candidates.sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).pop(); if (!neoVersion) throw new Error(`NeoForge سازگار با Minecraft ${minecraftVersion} پیدا نشد.`); const url = `https://maven.neoforged.net/releases/net/neoforged/neoforge/${neoVersion}/neoforge-${neoVersion}-installer.jar`; const installer = path.join(root, 'cache', `neoforge-${neoVersion}-installer.jar`); if (!fs.existsSync(installer)) await download(url, installer, onProgress); await runJava(javaPath, ['-jar', installer, '--install-client', root], root); return { loader: 'neoforge', loaderVersion: neoVersion, profileId: `neoforge-${neoVersion}` } }
+function getCompatibleLoaders(version) { const v = String(version || ''); const is121 = /^1\.21(?:\.(\d+))?$/.test(v); const patch = Number(v.match(/^1\.21\.(\d+)$/)?.[1] || 0); return { minecraftVersion: v, vanilla: true, fabric: is121 || /^1\.20\./.test(v), forge: /^1\.(12|13|14|15|16|17|18|19|20|21)\./.test(v), neoforge: is121 && patch >= 0, optifine: /^1\.(8|12|13|14|15|16|17|18|19|20|21)\./.test(v) } }
+function listInstalled(root) { const dir = path.join(root, 'versions'); if (!fs.existsSync(dir)) return []; return fs.readdirSync(dir, { withFileTypes: true }).filter(x => x.isDirectory()).map(x => x.name) }
+module.exports = { installFabric, installForge, installNeoForge, listInstalled, download, getCompatibleLoaders, neoChannelForMinecraft }
