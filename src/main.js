@@ -6,6 +6,7 @@ const net = require('net')
 const { Client } = require('minecraft-launcher-core')
 const { ensureJava } = require('./java-manager')
 const { installFabric, installForge, installNeoForge, listInstalled } = require('./loader-manager')
+const { registerBinerCore } = require('./biner-core')
 
 const isDev = !app.isPackaged
 let launcherProcess = null
@@ -26,37 +27,8 @@ function createWindow() {
   mainWindow = new BrowserWindow({ width: 1440, height: 900, minWidth: 1100, minHeight: 700, frame: false, icon: fs.existsSync(icon) ? icon : undefined, backgroundColor: '#070b14', show: false, webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true } })
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'))
   mainWindow.webContents.once('did-finish-load', () => {
-    const profile = readProfile()
-    const zoom = Math.max(0.7, Math.min(1.4, Number(profile?.zoom) || 1))
-    mainWindow.webContents.setZoomFactor(zoom)
-    mainWindow.webContents.executeJavaScript(`
-      (() => {
-        const overlay = document.getElementById('progressOverlay')
-        const card = overlay?.querySelector('.progress-card')
-        if (!overlay || !card || document.getElementById('progressCloseButton')) return
-
-        const close = document.createElement('button')
-        close.id = 'progressCloseButton'
-        close.type = 'button'
-        close.setAttribute('aria-label', 'Close download progress')
-        close.textContent = '×'
-        close.style.cssText = 'position:absolute;top:12px;right:14px;width:34px;height:34px;border:1px solid rgba(255,255,255,.12);border-radius:10px;background:rgba(255,255,255,.05);color:#fff;font:600 22px/30px Arial,sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:20;transition:background .18s ease,transform .18s ease;'
-        close.onmouseenter = () => { close.style.background='rgba(255,255,255,.12)'; close.style.transform='scale(1.05)' }
-        close.onmouseleave = () => { close.style.background='rgba(255,255,255,.05)'; close.style.transform='scale(1)' }
-        close.onclick = () => { window.__binerProgressDismissed = true; overlay.classList.add('hidden') }
-        card.style.position = 'relative'
-        card.appendChild(close)
-
-        const resetDismissed = () => { window.__binerProgressDismissed = false }
-        document.getElementById('playBtn')?.addEventListener('click', resetDismissed)
-        document.getElementById('previewPlay')?.addEventListener('click', resetDismissed)
-
-        const observer = new MutationObserver(() => {
-          if (window.__binerProgressDismissed && !overlay.classList.contains('hidden')) overlay.classList.add('hidden')
-        })
-        observer.observe(overlay, { attributes: true, attributeFilter: ['class'] })
-      })()
-    `).catch(() => {})
+    const profile = readProfile(); const zoom = Math.max(0.7, Math.min(1.4, Number(profile?.zoom) || 1)); mainWindow.webContents.setZoomFactor(zoom)
+    mainWindow.webContents.executeJavaScript(`(() => { const overlay=document.getElementById('progressOverlay'); const card=overlay?.querySelector('.progress-card'); if(!overlay||!card||document.getElementById('progressCloseButton'))return; const close=document.createElement('button'); close.id='progressCloseButton'; close.type='button'; close.setAttribute('aria-label','Close download progress'); close.textContent='×'; close.style.cssText='position:absolute;top:12px;right:14px;width:34px;height:34px;border:1px solid rgba(255,255,255,.12);border-radius:10px;background:rgba(255,255,255,.05);color:#fff;font:600 22px/30px Arial,sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:20;'; close.onclick=()=>{window.__binerProgressDismissed=true;overlay.classList.add('hidden')}; card.style.position='relative'; card.appendChild(close); const reset=()=>{window.__binerProgressDismissed=false}; document.getElementById('playBtn')?.addEventListener('click',reset); document.getElementById('previewPlay')?.addEventListener('click',reset); })()`).catch(() => {})
   })
   mainWindow.once('ready-to-show', () => mainWindow.show())
   if (isDev) mainWindow.webContents.openDevTools({ mode: 'detach' })
@@ -75,8 +47,7 @@ async function launchMinecraft({ username, version, memory, serverHost, serverPo
   else if (loader === 'forge') { customVersion = profileId || listInstalled(root).find(v => v.startsWith(`forge-${version}-`)) || ''; if (!customVersion) { const r = await installForge({ root, minecraftVersion: version, javaPath: java.path, onProgress: p => send('launcher:progress', { stage: 'loader', progress: p, message: `نصب Forge ${p}%` }) }); customVersion = r.profileId } }
   else if (loader === 'neoforge') { customVersion = profileId || listInstalled(root).find(v => v.startsWith(`neoforge-`)) || ''; if (!customVersion) { const r = await installNeoForge({ root, minecraftVersion: version, javaPath: java.path, onProgress: p => send('launcher:progress', { stage: 'loader', progress: p, message: `نصب NeoForge ${p}%` }) }); customVersion = r.profileId } }
   else if (loader === 'optifine') { const installed = listInstalled(root).find(v => v.startsWith(`OptiFine_${version}`) || v.startsWith(`optifine-${version}-`)); if (installed) customVersion = installed }
-  const uuid = offlineUuid(username)
-  const authorization = { access_token: '0', client_token: uuid.replaceAll('-', ''), uuid, name: username }
+  const uuid = offlineUuid(username); const authorization = { access_token: '0', client_token: uuid.replaceAll('-', ''), uuid, name: username }
   const performanceArgs = fastMode ? ['-XX:+UseG1GC', '-XX:+ParallelRefProcEnabled', '-XX:MaxGCPauseMillis=50', '-XX:+UnlockExperimentalVMOptions', '-XX:+DisableExplicitGC', '-XX:+AlwaysPreTouch'] : []
   const options = { authorization, root, version: { number: version, type: 'release', ...(customVersion ? { custom: customVersion } : {}) }, memory: { max: `${maxMemory}M`, min: '1024M' }, javaPath: java.path, window: { width: String(width), height: String(height), fullscreen: Boolean(fullscreen) }, customArgs: [...performanceArgs, ...(Array.isArray(customArgs) ? customArgs : [])] }
   if (serverHost) options.server = { host: String(serverHost), port: Number(serverPort) || 25565 }
@@ -91,8 +62,7 @@ async function launchMinecraft({ username, version, memory, serverHost, serverPo
     launcher.on('progress', p => { const current = Number(p?.current ?? p?.progress ?? p?.downloaded ?? 0); const total = Number(p?.total ?? 0); const percent = total > 0 ? Math.round(current / total * 100) : Number(p?.percent ?? p?.progress ?? 0); send('launcher:progress', { stage: 'minecraft', progress: Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : 0, current: p?.type || p?.name || 'files', received: current, total, message: `دانلود ${p?.type || 'فایل‌ها'}...` }) })
     launcher.on('error', error => { launcherProcess = null; const report = writeCrashReport(error, { username, version, loader }); send('launcher:crash', { message: error?.message || String(error), report }); if (!started) reject(error instanceof Error ? error : new Error(String(error))) })
     launcher.on('close', code => { launcherProcess = null; if (code && code !== 0) { const report = writeCrashReport(new Error(`Minecraft exited with code ${code}`), { username, version, loader, code }); send('launcher:crash', { message: `Minecraft با کد ${code} بسته شد.`, report }) } send('launcher:progress', { stage: 'closed', progress: 100, code, message: 'Minecraft بسته شد.' }) })
-    launcherProcess = launcher
-    launcher.launch(options).then(() => { started = true; send('launcher:progress', { stage: 'launched', progress: 100, message: 'Minecraft اجرا شد 🚀' }); resolve({ ok: true, version, javaVersion: java.version, loader, profileId: customVersion }) }).catch(error => { launcherProcess = null; const report = writeCrashReport(error, { username, version, loader }); send('launcher:crash', { message: error?.message || String(error), report }); reject(error) })
+    launcherProcess = launcher; launcher.launch(options).then(() => { started = true; send('launcher:progress', { stage: 'launched', progress: 100, message: 'Minecraft اجرا شد 🚀' }); resolve({ ok: true, version, javaVersion: java.version, loader, profileId: customVersion }) }).catch(error => { launcherProcess = null; const report = writeCrashReport(error, { username, version, loader }); send('launcher:crash', { message: error?.message || String(error), report }); reject(error) })
   })
 }
 
@@ -111,7 +81,7 @@ app.whenReady().then(() => {
   ipcMain.handle('app:check-updates', async () => { try { const latest = await fetchJson('https://api.github.com/repos/hirad990/BinerLauncher/releases/latest'); return { update: latest.tag_name !== `v${app.getVersion()}` && latest.tag_name !== app.getVersion(), version: latest.tag_name, name: latest.name, url: latest.html_url, notes: latest.body || '' } } catch (e) { return { update: false, error: e.message } } })
   ipcMain.handle('server:status', async (_, { host = 'Play.BinerCraft.ir', port = 25565 } = {}) => pingServer(host, port))
   ipcMain.handle('profile:get', () => readProfile())
-  ipcMain.handle('profile:save', (_, p) => { const current = readProfile() || {}; return writeProfile({ username: String(p.username || '').trim(), memory: Number(p.memory) || 4096, version: String(p.version || '1.21.11'), loader: String(p.loader || 'vanilla'), profileId: String(p.profileId || ''), serverHost: String(p.serverHost || 'Play.BinerCraft.ir'), serverPort: Number(p.serverPort) || 25565, developerMode: Boolean(p.developerMode), fullscreen: Boolean(p.fullscreen), width: Number(p.width) || 1280, height: Number(p.height) || 720, snapshots: Boolean(p.snapshots), fastMode: p.fastMode !== false, customArgs: Array.isArray(p.customArgs) ? p.customArgs : [], zoom: Math.max(0.7, Math.min(1.4, Number(p.zoom) || Number(current.zoom) || 1)) }) })
+  ipcMain.handle('profile:save', (_, p) => { const current = readProfile() || {}; return writeProfile({ username: String(p.username || '').trim(), memory: Number(p.memory) || 4096, version: String(p.version || '1.21.11'), loader: String(p.loader || 'vanilla'), profileId: String(p.profileId || ''), serverHost: String(p.serverHost || 'Play.BinerCraft.ir'), serverPort: Number(p.serverPort) || 25565, developerMode: Boolean(p.developerMode), fullscreen: Boolean(p.fullscreen), width: Number(p.width) || 1280, height: Number(p.height) || 720, snapshots: Boolean(p.snapshots), fastMode: p.fastMode !== false, customArgs: Array.isArray(p.customArgs) ? p.customArgs : [], zoom: Math.max(0.7, Math.min(1.4, Number(p.zoom) || Number(current.zoom) || 1)), language: p.language === 'en' ? 'en' : 'fa' }) })
   ipcMain.handle('ui:set-zoom', (_, value) => { if (!mainWindow) return 1; const zoom = Math.max(0.7, Math.min(1.4, Number(value) || 1)); mainWindow.webContents.setZoomFactor(zoom); const current = readProfile() || {}; writeProfile({ ...current, zoom }); return zoom })
   ipcMain.handle('ui:get-zoom', () => { const current = readProfile() || {}; return Math.max(0.7, Math.min(1.4, Number(current.zoom) || 1)) })
   ipcMain.handle('minecraft:status', () => ({ running: Boolean(launcherProcess) }))
@@ -120,6 +90,7 @@ app.whenReady().then(() => {
   ipcMain.handle('minecraft:import-optifine', async () => { const result = await dialog.showOpenDialog(mainWindow, { title: 'انتخاب OptiFine JAR یا Installer', filters: [{ name: 'OptiFine', extensions: ['jar'] }], properties: ['openFile'] }); if (result.canceled) return null; const dir = path.join(minecraftRoot(), 'optifine'); fs.mkdirSync(dir, { recursive: true }); const source = result.filePaths[0]; const target = path.join(dir, path.basename(source)); fs.copyFileSync(source, target); send('launcher:progress', { stage: 'optifine', progress: 100, message: 'OptiFine ذخیره شد. برای نصب واقعی، Installer را با Java اجرا کنید.' }); return target })
   ipcMain.handle('minecraft:folders', () => ({ root: minecraftRoot(), userData: app.getPath('userData'), runtime: path.join(app.getPath('userData'), 'runtime'), crashes: crashRoot() }))
   ipcMain.handle('minecraft:launch', (_, payload) => launchMinecraft(payload))
+  registerBinerCore({ ipcMain, app, minecraftRoot, fetchJson })
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
 })
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
