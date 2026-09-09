@@ -1,4 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron')
+const path = require('path')
+const { pathToFileURL } = require('url')
 const invoke=(channel,...args)=>ipcRenderer.invoke(channel,...args)
 contextBridge.exposeInMainWorld('biner',{
  appVersion:()=>invoke('app:get-version'),openExternal:url=>invoke('app:open-external',url),openFolder:target=>invoke('app:open-folder',target),toggleDevTools:open=>invoke('app:toggle-devtools',open),clearCache:()=>invoke('app:clear-cache'),getProfile:()=>invoke('profile:get'),saveProfile:p=>invoke('profile:save',p),
@@ -16,48 +18,20 @@ window.addEventListener('DOMContentLoaded',()=>{
  document.addEventListener('click',e=>{const b=e.target.closest('#playBtn,#previewPlay');if(b){e.preventDefault();e.stopImmediatePropagation();runSmart()}},true)
  const fastModeObserver=new MutationObserver(()=>{const row=[...document.querySelectorAll('.toggle-row')].find(x=>x.textContent.includes('Fast Launch'));if(!row||row.querySelector('#fastModeInput'))return;const input=document.createElement('input');input.type='checkbox';input.id='fastModeInput';input.style.cssText='width:18px;height:18px;cursor:pointer;accent-color:#7c5cff;margin-inline-start:12px';row.appendChild(input);invoke('profile:get').then(p=>input.checked=p?.fastMode!==false);input.addEventListener('change',async()=>{const p=await invoke('profile:get')||{};p.fastMode=input.checked;await invoke('profile:save',p)})});fastModeObserver.observe(document.documentElement,{childList:true,subtree:true})
 
- // BinerLauncher SVG icon layer: replaces legacy Unicode/emoji UI glyphs with crisp inline SVGs.
- const iconPaths={
-  home:'M3 10.8 12 3l9 7.8V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
-  versions:'M4 5h16v4H4z M4 11h16v4H4z M4 17h10v2H4z',
-  instances:'M4 4h7v7H4z M13 4h7v7h-7z M4 13h7v7H4z M13 13h7v7h-7z',
-  loader:'M12 3v5 M12 16v5 M3 12h5 M16 12h5 M5.6 5.6l3.5 3.5 M14.9 14.9l3.5 3.5 M18.4 5.6l-3.5 3.5 M9.1 14.9l-3.5 3.5 M12 9.2a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6z',
-  news:'M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z M7 8h10 M7 12h10 M7 16h6',
-  settings:'M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z M19.4 15a1.8 1.8 0 0 0 .36 1.98l.05.05-1.8 1.8-.05-.05a1.8 1.8 0 0 0-1.98-.36 1.8 1.8 0 0 0-1.1 1.66V20h-2.55v-.08a1.8 1.8 0 0 0-1.1-1.66 1.8 1.8 0 0 0-1.98.36l-.05.05-1.8-1.8.05-.05A1.8 1.8 0 0 0 7.9 15a1.8 1.8 0 0 0-1.66-1.1H6V11.4h.24A1.8 1.8 0 0 0 7.9 10.3a1.8 1.8 0 0 0-.36-1.98l-.05-.05 1.8-1.8.05.05a1.8 1.8 0 0 0 1.98.36 1.8 1.8 0 0 0 1.1-1.66V5h2.55v.08a1.8 1.8 0 0 0 1.1 1.66 1.8 1.8 0 0 0 1.98-.36l.05-.05 1.8 1.8-.05.05A1.8 1.8 0 0 0 19.4 10c.2.64.78 1.1 1.46 1.1H21v2.5h-.14A1.8 1.8 0 0 0 19.4 15z',
-  developer:'M8 8 4 12l4 4 M16 8l4 4-4 4 M13 5l-2 14',
-  play:'M8 5v14l11-7z',
-  store:'M5 9h14l-1 11H6L5 9z M8 9a4 4 0 0 1 8 0 M9 13h6',
-  version:'M5 5h14v14H5z M9 9h6 M9 13h4',
-  profile:'M12 12a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z M5 21a7 7 0 0 1 14 0',
-  boost:'M13 2 5 13h6l-1 9 8-12h-6z',
-  search:'M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z M16 16l5 5',
-  refresh:'M20 11a8 8 0 0 0-14.9-4L3 10 M3 4v6h6 M4 13a8 8 0 0 0 14.9 4L21 14 M21 20v-6h-6',
-  add:'M12 5v14 M5 12h14',
-  folder:'M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
-  java:'M8 5c3 1 1 3 3 4s2 3-1 4 M16 5c-3 1-1 3-3 4s-2 3 1 4 M7 18c3 2 7 2 10 0',
-  tools:'M14 6l4 4 M5 19l6-6 M7 7l10 10 M15 5a4 4 0 0 0-5 5l-6 6 4 4 6-6a4 4 0 0 0 5-5z',
-  console:'M5 7l5 5-5 5 M12 17h7',
-  clear:'M6 7h12 M9 7V5h6v2 M8 10v7 M12 10v7 M16 10v7 M5 7l1 14h12l1-14',
-  export:'M12 3v12 M7 10l5 5 5-5 M5 21h14',
-  world:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M3 12h18 M12 3c2.2 2.5 3.3 5.5 3.3 9s-1.1 6.5-3.3 9c-2.2-2.5-3.3-5.5-3.3-9S9.8 5.5 12 3z',
-  resource:'M4 5h16v14H4z M8 5v14 M4 10h4 M12 10h8 M12 15h8',
-  server:'M4 5h16v5H4z M4 14h16v5H4z M7 7.5h.01 M7 16.5h.01 M10 7.5h7 M10 16.5h7',
-  update:'M12 4v8l5 3 M20 12a8 8 0 1 1-2.34-5.66',
-  crash:'M8 4v3 M16 4v3 M5 8h14v11H5z M9 12l2 2 4-4',
-  pack:'M4 7 12 3l8 4-8 4z M4 7v10l8 4 8-4V7 M12 11v10',
-  close:'M6 6l12 12 M18 6 6 18',
-  maximize:'M6 6h12v12H6z',
-  minimize:'M5 12h14'
- };
- const svg=(name)=>{const p=iconPaths[name]||iconPaths.tools;const el=document.createElement('span');el.className='biner-svg-icon';el.setAttribute('aria-hidden','true');el.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${p.split(' M').map((x,i)=>i?' M'+x:x).join('')}</svg>`;return el};
- const style=document.createElement('style');style.textContent='.biner-svg-icon{display:inline-grid;place-items:center;width:18px;height:18px;flex:0 0 18px;color:currentColor;vertical-align:middle}.biner-svg-icon svg{width:100%;height:100%;display:block}.nav-item .biner-svg-icon{width:17px;height:17px;flex-basis:17px}.quick-icon .biner-svg-icon{width:17px;height:17px}.pc h3 .biner-svg-icon,.dev-card .biner-svg-icon,.setting-tab .biner-svg-icon{margin-inline-end:6px}.play-main .biner-svg-icon{grid-row:1/3;align-self:center;width:17px;height:17px}.search-box .biner-svg-icon{width:16px;height:16px}.toolbar .biner-svg-icon{width:16px;height:16px}.primary>.biner-svg-icon,.ghost>.biner-svg-icon{margin-inline-end:6px}.biner-svg-icon svg{pointer-events:none}';document.head.appendChild(style);
- const put=(el,name)=>{if(!el||el.querySelector(':scope>.biner-svg-icon'))return;el.prepend(svg(name));};
+ // BinerLauncher Font Awesome icon layer. Font Awesome is bundled locally for offline/installed builds.
+ try{
+  const cssPath=require.resolve('@fortawesome/fontawesome-free/css/all.min.css')
+  const link=document.createElement('link');link.rel='stylesheet';link.href=pathToFileURL(cssPath).href;document.head.appendChild(link)
+ }catch(e){console.warn('BinerLauncher Font Awesome CSS unavailable:',e)}
+ const iconClasses={
+  home:'fa-house',versions:'fa-layer-group',instances:'fa-table-cells-large',loader:'fa-puzzle-piece',news:'fa-newspaper',settings:'fa-gear',developer:'fa-code',play:'fa-play',store:'fa-arrow-up-right-from-square',version:'fa-cube',profile:'fa-user',boost:'fa-bolt',search:'fa-magnifying-glass',refresh:'fa-rotate',add:'fa-plus',folder:'fa-folder-open',java:'fa-mug-hot',tools:'fa-screwdriver-wrench',console:'fa-terminal',clear:'fa-trash-can',export:'fa-download',world:'fa-earth-americas',resource:'fa-palette',server:'fa-server',update:'fa-arrows-rotate',crash:'fa-triangle-exclamation',pack:'fa-box-open',close:'fa-xmark',maximize:'fa-up-right-and-down-left-from-center',minimize:'fa-minus'
+ }
+ const svg=(name)=>{const el=document.createElement('i');el.className=`fa-solid ${iconClasses[name]||iconClasses.tools} biner-fa-icon`;el.setAttribute('aria-hidden','true');return el}
+ const style=document.createElement('style');style.textContent='.biner-fa-icon{display:inline-flex;align-items:center;justify-content:center;width:18px;min-width:18px;height:1em;line-height:1;flex:0 0 18px;color:currentColor;vertical-align:-.08em}.nav-item .biner-fa-icon{width:17px;min-width:17px;flex-basis:17px;margin-inline-end:2px}.quick-icon .biner-fa-icon{width:17px;min-width:17px}.pc h3 .biner-fa-icon,.dev-card .biner-fa-icon,.setting-tab .biner-fa-icon{margin-inline-end:6px}.play-main .biner-fa-icon{margin-inline-end:6px}.search-box .biner-fa-icon{width:16px;min-width:16px}.toolbar .biner-fa-icon{width:16px;min-width:16px}.primary>.biner-fa-icon,.ghost>.biner-fa-icon{margin-inline-end:6px}.biner-fa-icon{pointer-events:none}';document.head.appendChild(style)
  const leading={
   '⌂':['nav-item','home'],'◈':['nav-item','versions'],'▦':['nav-item','instances'],'🧩':['nav-item','loader'],'◉':['nav-item','news'],'⚙':['nav-item','settings'],'⌘':['nav-item','developer'],'✦':['nav-item','tools'],
-  '▶':['play'],'↗':['store'],'⚡':['boost'],'⌕':['search'],'↻':['refresh'],'＋':['add'],'📁':['folder'],'🛠':['tools'],'▣':['console'],'☕':['java'],'♻':['clear'],'⇩':['export'],'🌐':['server'],'📦':['pack'],'🌍':['world'],'🎨':['resource'],'🔎':['crash'],'🔄':['update']
- };
- const scan=()=>{document.querySelectorAll('button,.quick-icon,.news-icon,h3,.search-box').forEach(el=>{if(el.querySelector('.biner-svg-icon'))return;const walker=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);let n;while(n=walker.nextNode()){const t=n.nodeValue;const key=Object.keys(leading).find(k=>t.trimStart().startsWith(k));if(!key)continue;const idx=t.indexOf(key);if(idx<0)continue;n.nodeValue=t.slice(0,idx)+t.slice(idx+key.length);const icon=svg(leading[key][1]);n.parentNode.insertBefore(icon,n);break}})};
- scan();
- new MutationObserver(scan).observe(document.body,{childList:true,subtree:true});
-
+  '▶':['play'],'↗':['store'],'⚡':['boost'],'⌕':['search'],'↻':['refresh'],'＋':['add'],'📁':['folder'],'🛠':['tools'],'▣':['console'],'☕':['java'],'♻':['clear'],'⇩':['export'],'🌐':['server'],'📦':['pack'],'🌍':['world'],'🎨':['resource'],'🔎':['crash'],'🔄':['update'],'✓':['clear']
+ }
+ const scan=()=>{document.querySelectorAll('button,.quick-icon,.news-icon,h3,.search-box').forEach(el=>{if(el.querySelector('.biner-fa-icon'))return;const walker=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);let n;while(n=walker.nextNode()){const t=n.nodeValue;const key=Object.keys(leading).find(k=>t.trimStart().startsWith(k));if(!key)continue;const idx=t.indexOf(key);if(idx<0)continue;n.nodeValue=t.slice(0,idx)+t.slice(idx+key.length);const icon=svg(leading[key][1]);n.parentNode.insertBefore(icon,n);break}})};
+ scan();new MutationObserver(scan).observe(document.body,{childList:true,subtree:true});
 })
