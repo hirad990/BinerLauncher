@@ -19,6 +19,19 @@ function safeZipEntry(name) {
 }
 
 function registerBinerCore({ ipcMain, app, minecraftRoot, fetchJson, send = () => {}, crashRoot = () => path.join(app.getPath('userData'), 'crash-reports') }) {
+  // Make every BinerCore IPC failure visible in the Electron/launcher console.
+  // The original Electron IPC behaviour is preserved: errors are still re-thrown to the renderer.
+  const originalHandle = ipcMain.handle.bind(ipcMain)
+  ipcMain.handle = (channel, listener) => originalHandle(channel, async (event, ...args) => {
+    try {
+      return await listener(event, ...args)
+    } catch (error) {
+      console.error('[BinerLauncher][Internal]', `IPC ${channel} failed:`, error?.stack || error)
+      send('launcher:log', `[Internal Error] ${channel}: ${error?.message || String(error)}`)
+      throw error
+    }
+  })
+
   const root = minecraftRoot()
   const instancesRoot = () => path.join(app.getPath('userData'), 'instances')
   const backupRoot = () => path.join(app.getPath('userData'), 'backups')
@@ -77,7 +90,7 @@ function registerBinerCore({ ipcMain, app, minecraftRoot, fetchJson, send = () =
   })
 
   ipcMain.handle('biner:worlds:list', (_, instanceId = '') => { const dir = instanceId ? path.join(instanceDir(instanceId), 'saves') : path.join(root, 'saves'); return listDirectories(dir).map(name => ({ name, path: path.join(dir, name), size: dirSize(path.join(dir, name)) })) })
-  ipcMain.handle('biner:worlds:delete', (_, { name, instanceId = '' } = {}) => { const base = instanceId ? path.join(instanceDir(instanceId), 'saves') : path.join(root, 'saves'); removeSafe(path.join(base, safeName(name)), base); return true })
+  ipcMain.handle('biner:worlds:delete', (_, { name, instanceId = '' } = {}) => { const base = instanceId ? path.join(instanceDir(instanceId), 'saves') : root; removeSafe(path.join(base, 'saves', safeName(name)), path.join(base, 'saves')); return true })
   ipcMain.handle('biner:backups:create', (_, { source = 'worlds', name = '', instanceId = '' } = {}) => { const base = instanceId ? instanceDir(instanceId) : root; const sourceDir = source === 'mods' ? path.join(base, 'mods') : source === 'resourcepacks' ? path.join(base, 'resourcepacks') : source === 'shaderpacks' ? path.join(base, 'shaderpacks') : path.join(base, 'saves'); if (!fs.existsSync(sourceDir)) throw new Error('داده‌ای برای Backup وجود ندارد.'); const id = `${safeName(name || source)}-${new Date().toISOString().replace(/[:.]/g, '-')}`; const zipPath = path.join(backupRoot(), `${id}.zip`); ensure(backupRoot()); const zip = new AdmZip(); zip.addLocalFolder(sourceDir, source); zip.writeZip(zipPath); return { name: path.basename(zipPath), path: zipPath, size: fs.statSync(zipPath).size } })
   ipcMain.handle('biner:backups:list', () => listFiles(backupRoot(), '.zip').map(name => ({ name, path: path.join(backupRoot(), name), size: fs.statSync(path.join(backupRoot(), name)).size })))
   ipcMain.handle('biner:backups:restore', (_, { file, instanceId = '' } = {}) => { const target = path.join(backupRoot(), path.basename(String(file || ''))); if (!fs.existsSync(target)) throw new Error('Backup پیدا نشد.'); const base = instanceId ? instanceDir(instanceId) : root; const zip = new AdmZip(target); for (const entry of zip.getEntries()) safeZipEntry(entry.entryName); zip.extractAllTo(base, true); return true })
