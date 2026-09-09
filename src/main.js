@@ -18,13 +18,36 @@ function readProfile() { try { return JSON.parse(fs.readFileSync(dataPath(), 'ut
 function writeProfile(profile) { fs.mkdirSync(path.dirname(dataPath()), { recursive: true }); fs.writeFileSync(dataPath(), JSON.stringify(profile, null, 2), 'utf8'); return profile }
 function offlineUuid(username) { const hex = crypto.createHash('md5').update(`OfflinePlayer:${username}`).digest('hex'); return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}` }
 function send(channel, payload) { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload) }
-async function fetchJson(url) { const r = await fetch(url, { headers: { 'User-Agent': 'BinerLauncher/0.3.1' } }); if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() }
+async function fetchJson(url, timeout = 15000) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeout)
+  try {
+    const r = await fetch(url, { headers: { 'User-Agent': 'BinerLauncher/0.5.0', 'Accept': 'application/json' }, signal: controller.signal })
+    if (!r.ok) throw new Error(`HTTP ${r.status}`)
+    return await r.json()
+  } finally { clearTimeout(timer) }
+}
+async function fetchVersionManifest() {
+  const urls = [
+    'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json',
+    'https://launchermeta.mojang.com/mc/game/version_manifest_v2.json'
+  ]
+  let lastError = null
+  for (const url of urls) {
+    try {
+      const data = await fetchJson(url, 20000)
+      if (Array.isArray(data?.versions)) return data
+      throw new Error('Invalid Minecraft version manifest')
+    } catch (error) { lastError = error }
+  }
+  throw new Error(`Minecraft version manifest unavailable: ${lastError?.message || 'network error'}`)
+}
 function writeCrashReport(error, extra = {}) { try { fs.mkdirSync(crashRoot(), { recursive: true }); const stamp = new Date().toISOString().replace(/[:.]/g, '-'); const file = path.join(crashRoot(), `biner-crash-${stamp}.log`); const text = [`BinerLauncher Crash Report`, `Time: ${new Date().toISOString()}`, `Platform: ${process.platform}`, `Electron: ${process.versions.electron}`, `Node: ${process.versions.node}`, `Error: ${error?.stack || error}`, JSON.stringify(extra, null, 2)].join('\n\n'); fs.writeFileSync(file, text, 'utf8'); return file } catch { return null } }
 function pingServer(host, port, timeout = 3000) { return new Promise(resolve => { const started = Date.now(); const socket = new net.Socket(); let done = false; const finish = result => { if (done) return; done = true; socket.destroy(); resolve(result) }; socket.setTimeout(timeout); socket.once('connect', () => finish({ online: true, ping: Date.now() - started, host, port })); socket.once('timeout', () => finish({ online: false, ping: null, host, port, error: 'timeout' })); socket.once('error', e => finish({ online: false, ping: null, host, port, error: e.code || e.message })); socket.connect(Number(port) || 25565, String(host)) }) }
 
 function createWindow() {
   const icon = path.join(__dirname, '..', 'icon.png')
-  mainWindow = new BrowserWindow({ width: 1440, height: 900, minWidth: 1100, minHeight: 700, frame: false, icon: fs.existsSync(icon) ? icon : undefined, backgroundColor: '#070b14', show: false, webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true } })
+  mainWindow = new BrowserWindow({ width: 1440, height: 900, minWidth: 1100, minHeight: 700, frame: false, icon: fs.existsSync(icon) ? icon : undefined, backgroundColor: '#070b14', show: false, webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: false } })
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'))
   mainWindow.webContents.once('did-finish-load', () => {
     const profile = readProfile(); const zoom = Math.max(0.7, Math.min(1.4, Number(profile?.zoom) || 1)); mainWindow.webContents.setZoomFactor(zoom)
@@ -62,7 +85,7 @@ async function launchMinecraft({ username, version, memory, serverHost, serverPo
     launcher.on('progress', p => { const current = Number(p?.current ?? p?.progress ?? p?.downloaded ?? 0); const total = Number(p?.total ?? 0); const percent = total > 0 ? Math.round(current / total * 100) : Number(p?.percent ?? p?.progress ?? 0); send('launcher:progress', { stage: 'minecraft', progress: Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : 0, current: p?.type || p?.name || 'files', received: current, total, message: `دانلود ${p?.type || 'فایل‌ها'}...` }) })
     launcher.on('error', error => { launcherProcess = null; const report = writeCrashReport(error, { username, version, loader }); send('launcher:crash', { message: error?.message || String(error), report }); if (!started) reject(error instanceof Error ? error : new Error(String(error))) })
     launcher.on('close', code => { launcherProcess = null; if (code && code !== 0) { const report = writeCrashReport(new Error(`Minecraft exited with code ${code}`), { username, version, loader, code }); send('launcher:crash', { message: `Minecraft با کد ${code} بسته شد.`, report }) } send('launcher:progress', { stage: 'closed', progress: 100, code, message: 'Minecraft بسته شد.' }) })
-    launcherProcess = launcher; launcher.launch(options).then(() => { started = true; send('launcher:progress', { stage: 'launched', progress: 100, message: 'Minecraft اجرا شد 🚀' }); resolve({ ok: true, version, javaVersion: java.version, loader, profileId: customVersion }) }).catch(error => { launcherProcess = null; const report = writeCrashReport(error, { username, version, loader }); send('launcher:crash', { message: error?.message || String(error), report }); reject(error) })
+    launcherProcess = launcher; launcher.launch(options).then(() => { started = true; send('launcher:progress', { stage: 'launched', progress: 100, message: 'Minecraft اجرا شد.' }); resolve({ ok: true, version, javaVersion: java.version, loader, profileId: customVersion }) }).catch(error => { launcherProcess = null; const report = writeCrashReport(error, { username, version, loader }); send('launcher:crash', { message: error?.message || String(error), report }); reject(error) })
   })
 }
 
@@ -85,7 +108,7 @@ app.whenReady().then(() => {
   ipcMain.handle('ui:set-zoom', (_, value) => { if (!mainWindow) return 1; const zoom = Math.max(0.7, Math.min(1.4, Number(value) || 1)); mainWindow.webContents.setZoomFactor(zoom); const current = readProfile() || {}; writeProfile({ ...current, zoom }); return zoom })
   ipcMain.handle('ui:get-zoom', () => { const current = readProfile() || {}; return Math.max(0.7, Math.min(1.4, Number(current.zoom) || 1)) })
   ipcMain.handle('minecraft:status', () => ({ running: Boolean(launcherProcess) }))
-  ipcMain.handle('minecraft:versions', async (_, snapshots = false) => { const data = await fetchJson('https://piston-meta.mojang.com/mc/game/version_manifest_v2.json'); return data.versions.filter(v => snapshots || v.type === 'release').map(v => ({ id: v.id, type: v.type, releaseTime: v.releaseTime })).slice(0, snapshots ? 150 : 100) })
+  ipcMain.handle('minecraft:versions', async (_, snapshots = false) => { const data = await fetchVersionManifest(); const versions = data.versions.filter(v => snapshots || v.type === 'release').map(v => ({ id: v.id, type: v.type, releaseTime: v.releaseTime })); if (!versions.length) throw new Error('No Minecraft versions found.'); return versions.slice(0, snapshots ? 150 : 100) })
   ipcMain.handle('minecraft:install-loader', async (_, { loader, version }) => { const java = await ensureJava(app.getPath('userData'), p => send('launcher:progress', { stage: 'java', progress: p, message: `Java ${p}%` }), version); const common = { root: minecraftRoot(), minecraftVersion: version, javaPath: java.path, onProgress: p => send('launcher:progress', { stage: 'loader', progress: p, message: `${loader.toUpperCase()} ${p}%` }) }; if (loader === 'fabric') return installFabric(common); if (loader === 'forge') return installForge(common); if (loader === 'neoforge') return installNeoForge(common); throw new Error('Loader ناشناخته است.') })
   ipcMain.handle('minecraft:import-optifine', async () => { const result = await dialog.showOpenDialog(mainWindow, { title: 'انتخاب OptiFine JAR یا Installer', filters: [{ name: 'OptiFine', extensions: ['jar'] }], properties: ['openFile'] }); if (result.canceled) return null; const dir = path.join(minecraftRoot(), 'optifine'); fs.mkdirSync(dir, { recursive: true }); const source = result.filePaths[0]; const target = path.join(dir, path.basename(source)); fs.copyFileSync(source, target); send('launcher:progress', { stage: 'optifine', progress: 100, message: 'OptiFine ذخیره شد. برای نصب واقعی، Installer را با Java اجرا کنید.' }); return target })
   ipcMain.handle('minecraft:folders', () => ({ root: minecraftRoot(), userData: app.getPath('userData'), runtime: path.join(app.getPath('userData'), 'runtime'), crashes: crashRoot() }))
