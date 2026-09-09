@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld('biner', {
   checkForUpdates: () => ipcRenderer.invoke('app:check-updates'),
   getCrashReports: () => ipcRenderer.invoke('app:crash-reports'),
   openCrashReports: () => ipcRenderer.invoke('app:open-crash-reports'),
+  setZoom: value => ipcRenderer.invoke('ui:set-zoom', value),
+  getZoom: () => ipcRenderer.invoke('ui:get-zoom'),
   onProgress: callback => ipcRenderer.on('launcher:progress', (_, data) => callback(data)),
   onLog: callback => ipcRenderer.on('launcher:log', (_, data) => callback(data)),
   onCrash: callback => ipcRenderer.on('launcher:crash', (_, data) => callback(data)),
@@ -32,10 +34,9 @@ window.addEventListener('DOMContentLoaded', () => {
     grid.appendChild(card)
   }
 
-  // Replace platform-dependent emoji glyphs with crisp inline SVG icons.
   const icons = {
     '🧩': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h3v3h2V3h3a2 2 0 0 1 2 2v3h3v3h-3v2h3v3h-3v3a2 2 0 0 1-2 2h-3v-3H9v3H6a2 2 0 0 1-2-2v-3H1v-3h3V9H1V6h3V5a2 2 0 0 1 2-2h2v3h0V3Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>',
-    '⚙': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6Zm8.2 3.8c0-.5-.1-1-.2-1.5l2-1.5-2-3.4-2.3 1a8.4 8.4 0 0 0-2.6-1.5L14.8 3h-4l-.3 2.1a8.4 8.4 0 0 0-2.6 1.5l-2.3-1-2 3.4 2 1.5c-.1.5-.2 1-.2 1.5s.1 1 .2 1.5l-2 1.5 2 3.4 2.3-1a8.4 8.4 0 0 0 2.6 1.5l.3 2.1h4l.3-2.1a8.4 8.4 0 0 0 2.6-1.5l2.3 1 2-3.4-2-1.5c.1-.5.2-1 .2-1.5Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
+    '⚙': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6Zm8.2 3.8c0-.5-.1-1-.2-1.5l2-1.5-2-3.4-2.3 1a8.4 8.4 0 0 0-2.6-1.5L14.8 3h-4l-.3 2.1a8.4 8.4 0 0 0-2.6 1.5l-2.3-1-2 3.4 2 1.5c-.1.5-.2 1-.2 1.5s.1 1 .2 1.5l-2 1.5 2 3.4 2.3-1a8.4 8.4 0 0 0 2.6 1.5l.3 2.1h4l.3-2.1a8.4 8.4 0 0 0 2.6-1.5l2.3 1 2.3 1 2-3.4-2-1.5c.1-.5.2-1 .2-1.5Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
     '📁': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A2.5 2.5 0 0 1 5.5 4H10l2 2h6.5A2.5 2.5 0 0 1 21 8.5v8A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5v-10Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>',
     '🛠': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6.5 3-3 3 3-3 3m-2-2-8.8 8.8a2.1 2.1 0 0 0 0 3l.1.1a2.1 2.1 0 0 0 3 0L18 10.5M5 5l3.5 3.5M4 20l3-3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     '☕': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h12v6a5 5 0 0 1-5 5H10a5 5 0 0 1-5-5V8Zm12 2h1.5a2.5 2.5 0 0 1 0 5H17M8 4c0 1 1 1 1 2M12 4c0 1 1 1 1 2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
@@ -58,6 +59,41 @@ window.addEventListener('DOMContentLoaded', () => {
     const holder = document.createElement('span')
     holder.innerHTML = html
     node.replaceWith(...holder.childNodes)
+  }
+
+  // Professional launcher GUI Scale control. Similar to Minecraft's GUI Scale,
+  // but applies to the entire Electron renderer and persists across restarts.
+  const launcherPanel = document.querySelector('.setting-panel[data-panel="launcher"]')
+  if (launcherPanel && !document.querySelector('#guiScaleControl')) {
+    const control = document.createElement('div')
+    control.id = 'guiScaleControl'
+    control.className = 'gui-scale-control'
+    control.innerHTML = `
+      <div class="gui-scale-head">
+        <div><b>GUI SCALE</b><small>اندازه رابط کاربری لانچر</small></div>
+        <strong id="guiScaleValue">100%</strong>
+      </div>
+      <div class="gui-scale-slider-row">
+        <span>70%</span><input id="guiScaleInput" type="range" min="70" max="140" step="5" value="100"><span>140%</span>
+      </div>
+      <div class="gui-scale-presets">
+        <button type="button" data-scale="80">80%</button><button type="button" data-scale="90">90%</button><button type="button" data-scale="100" class="active">100%</button><button type="button" data-scale="110">110%</button><button type="button" data-scale="120">120%</button><button type="button" data-scale="130">130%</button>
+      </div>
+      <p class="gui-scale-hint">برای صفحه‌های کوچک‌تر مقدار پایین‌تر و برای نمایشگرهای بزرگ مقدار بالاتر را انتخاب کن.</p>`
+    launcherPanel.appendChild(control)
+    const input = control.querySelector('#guiScaleInput')
+    const value = control.querySelector('#guiScaleValue')
+    const presets = [...control.querySelectorAll('[data-scale]')]
+    const apply = async percent => {
+      const safe = Math.max(70, Math.min(140, Number(percent) || 100))
+      input.value = safe
+      value.textContent = `${safe}%`
+      presets.forEach(b => b.classList.toggle('active', Number(b.dataset.scale) === safe))
+      await ipcRenderer.invoke('ui:set-zoom', safe / 100)
+    }
+    ipcRenderer.invoke('ui:get-zoom').then(z => apply(Math.round((Number(z) || 1) * 100)))
+    input.addEventListener('input', () => apply(input.value))
+    presets.forEach(b => b.addEventListener('click', () => apply(b.dataset.scale)))
   }
 })
 
