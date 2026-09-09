@@ -23,7 +23,6 @@ contextBridge.exposeInMainWorld('biner', {
   window: { minimize: () => ipcRenderer.send('window:minimize'), maximize: () => ipcRenderer.send('window:maximize'), close: () => ipcRenderer.send('window:close') }
 })
 
-// Keep the loader hub and performance controls usable even when the static renderer is unchanged.
 window.addEventListener('DOMContentLoaded', () => {
   const grid = document.querySelector('.loader-grid')
   if (grid && !grid.querySelector('[data-loader="neoforge"]')) {
@@ -33,7 +32,7 @@ window.addEventListener('DOMContentLoaded', () => {
     grid.appendChild(card)
   }
 
-  // Replace platform-dependent emoji glyphs with crisp, monochrome inline SVG icons.
+  // Replace platform-dependent emoji glyphs with crisp inline SVG icons.
   const icons = {
     '🧩': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h3v3h2V3h3a2 2 0 0 1 2 2v3h3v3h-3v2h3v3h-3v3a2 2 0 0 1-2 2h-3v-3H9v3H6a2 2 0 0 1-2-2v-3H1v-3h3V9H1V6h3V5a2 2 0 0 1 2-2h2v3h0V3Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>',
     '⚙': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6Zm8.2 3.8c0-.5-.1-1-.2-1.5l2-1.5-2-3.4-2.3 1a8.4 8.4 0 0 0-2.6-1.5L14.8 3h-4l-.3 2.1a8.4 8.4 0 0 0-2.6 1.5l-2.3-1-2 3.4 2 1.5c-.1.5-.2 1-.2 1.5s.1 1 .2 1.5l-2 1.5 2 3.4 2.3-1a8.4 8.4 0 0 0 2.6 1.5l.3 2.1h4l.3-2.1a8.4 8.4 0 0 0 2.6-1.5l2.3 1 2-3.4-2-1.5c.1-.5.2-1 .2-1.5Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
@@ -42,6 +41,10 @@ window.addEventListener('DOMContentLoaded', () => {
     '☕': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h12v6a5 5 0 0 1-5 5H10a5 5 0 0 1-5-5V8Zm12 2h1.5a2.5 2.5 0 0 1 0 5H17M8 4c0 1 1 1 1 2M12 4c0 1 1 1 1 2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
     '♻': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 4 3 3-3 3M5 10a7 7 0 0 1 12-4l1 1M16 20l-3-3 3-3M19 14a7 7 0 0 1-12 4l-1-1" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>'
   }
+
+  const style = document.createElement('style')
+  style.textContent = '.biner-svg-icon{display:inline-flex;width:16px;height:16px;flex:0 0 16px;align-items:center;justify-content:center;vertical-align:middle}.biner-svg-icon svg{display:block;width:16px;height:16px}.dev-card .biner-svg-icon{width:18px;height:18px;flex-basis:18px}.dev-card .biner-svg-icon svg{width:18px;height:18px}.nav-item .biner-svg-icon{width:17px;height:17px;flex-basis:17px}.nav-item .biner-svg-icon svg{width:17px;height:17px}'
+  document.head.appendChild(style)
 
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
   const nodes = []
