@@ -30,7 +30,8 @@
     "files": [
       "src/**/*",
       "package.json",
-      "icon.png"
+      "icon.png",
+      "icon.ico"
     ],
     "win": {
       "target": [
@@ -42,7 +43,7 @@
         }
       ],
       "artifactName": "Biner-Launcher-Setup-${version}.${ext}",
-      "icon": "icon.png"
+      "icon": "icon.ico"
     },
     "nsis": {
       "oneClick": true,
@@ -53,8 +54,9 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Biner Launcher",
       "runAfterFinish": true,
-      "installerIcon": "icon.png",
-      "installerHeaderIcon": "icon.png",
+      "installerIcon": "icon.ico",
+      "installerHeaderIcon": "icon.ico",
+      "uninstallerIcon": "icon.ico",
       "language": "1033",
       "unicode": true,
       "deleteAppDataOnUninstall": false
