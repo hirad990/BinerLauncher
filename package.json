@@ -9,8 +9,9 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
-    "build": "electron-builder",
-    "dist": "electron-builder --win"
+    "build": "npm run prepare-icon && electron-builder",
+    "dist": "npm run prepare-icon && electron-builder --win",
+    "prepare-icon": "node scripts/generate-icon.js"
   },
   "dependencies": {
     "minecraft-launcher-core": "^3.18.2",
@@ -18,6 +19,8 @@
   },
   "devDependencies": {
     "electron": "^38.1.0",
+    "electron-builder": "^26.0.12",
+    "png-to-ico": "^3.0.2",
     "electron-builder": "^26.0.12"
   },
   "build": {
