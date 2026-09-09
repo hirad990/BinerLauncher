@@ -7,6 +7,8 @@ const { createWriteStream } = require('fs')
 const AdmZip = require('adm-zip')
 
 const DEFAULT_JAVA = 21
+const SUPPORTED_JAVA = [8, 17, 21, 25]
+const JAVA_PREF_PREFIX = '--biner-java='
 
 function logJava(level, message, error = null, extra = null) {
   const prefix = '[BinerLauncher][Java]'
@@ -16,6 +18,13 @@ function logJava(level, message, error = null, extra = null) {
   else console.log(`${prefix} ${message}${details}`)
 }
 
+function normalizeJavaSelection(selectedJava) {
+  if (selectedJava === undefined || selectedJava === null || String(selectedJava).trim() === '' || String(selectedJava).toLowerCase() === 'auto') return null
+  const value = Number(selectedJava)
+  if (!SUPPORTED_JAVA.includes(value)) throw new Error(`نسخه Java انتخاب‌شده پشتیبانی نمی‌شود: ${selectedJava}`)
+  return value
+}
+
 function requiredJavaForMinecraft(version) {
   const value = String(version || '').trim()
   const modern = value.match(/^1\.(\d+)(?:\.(\d+))?$/)
@@ -23,14 +32,23 @@ function requiredJavaForMinecraft(version) {
     if (/^(?:2[6-9]|[3-9]\d)\./.test(value)) return 25
     return DEFAULT_JAVA
   }
-
   const minor = Number(modern[1])
   const patch = Number(modern[2] || 0)
-
   if (minor <= 16) return 8
   if (minor < 20 || (minor === 20 && patch <= 4)) return 17
   if (minor <= 21) return 21
   return 25
+}
+
+function readSelectedJava(userData) {
+  try {
+    const profile = JSON.parse(fs.readFileSync(path.join(userData, 'profile.json'), 'utf8'))
+    const args = Array.isArray(profile?.customArgs) ? profile.customArgs : []
+    const marker = args.find(arg => String(arg).startsWith(JAVA_PREF_PREFIX))
+    return normalizeJavaSelection(marker ? String(marker).slice(JAVA_PREF_PREFIX.length) : 'auto')
+  } catch {
+    return null
+  }
 }
 
 function execVersion(javaPath) {
@@ -107,9 +125,7 @@ function download(url, destination, onProgress) {
 }
 
 async function installManagedJava(userData, requiredJava, onProgress) {
-  if (process.platform !== 'win32' || process.arch !== 'x64') {
-    throw new Error('Automatic Java installation currently supports Windows x64 only.')
-  }
+  if (process.platform !== 'win32' || process.arch !== 'x64') throw new Error('Automatic Java installation currently supports Windows x64 only.')
   const root = managedJavaRoot(userData, requiredJava)
   fs.mkdirSync(root, { recursive: true })
   const archive = path.join(root, `temurin${requiredJava}.zip`)
@@ -131,9 +147,13 @@ async function installManagedJava(userData, requiredJava, onProgress) {
   }
 }
 
-async function ensureJava(userData, onProgress, minecraftVersion) {
-  const requiredJava = requiredJavaForMinecraft(minecraftVersion)
-  logJava('info', `Checking Java runtime`, null, { minecraftVersion, requiredJava })
+async function ensureJava(userData, onProgress, minecraftVersion, selectedJava = 'auto') {
+  const autoJava = requiredJavaForMinecraft(minecraftVersion)
+  const profileJava = readSelectedJava(userData)
+  const requestedJava = normalizeJavaSelection(selectedJava) ?? profileJava
+  const requiredJava = requestedJava || autoJava
+  logJava('info', `Checking Java runtime`, null, { minecraftVersion, mode: requestedJava ? 'manual' : 'auto', requiredJava, autoJava })
+  if (requestedJava && requestedJava !== autoJava) logJava('warn', `Manual Java ${requestedJava} selected for Minecraft ${minecraftVersion}; recommended Java is ${autoJava}`)
   try {
     const managed = await findManagedJava(userData, requiredJava)
     if (managed) {
@@ -153,4 +173,4 @@ async function ensureJava(userData, onProgress, minecraftVersion) {
   }
 }
 
-module.exports = { ensureJava, requiredJavaForMinecraft, DEFAULT_JAVA }
+module.exports = { ensureJava, requiredJavaForMinecraft, normalizeJavaSelection, DEFAULT_JAVA, SUPPORTED_JAVA, JAVA_PREF_PREFIX }
