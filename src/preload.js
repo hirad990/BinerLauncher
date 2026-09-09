@@ -1,37 +1,97 @@
 const { contextBridge, ipcRenderer } = require('electron')
 const path = require('path')
 const { pathToFileURL } = require('url')
-const invoke=(channel,...args)=>ipcRenderer.invoke(channel,...args)
-contextBridge.exposeInMainWorld('biner',{
- appVersion:()=>invoke('app:get-version'),openExternal:url=>invoke('app:open-external',url),openFolder:target=>invoke('app:open-folder',target),toggleDevTools:open=>invoke('app:toggle-devtools',open),clearCache:()=>invoke('app:clear-cache'),getProfile:()=>invoke('profile:get'),saveProfile:p=>invoke('profile:save',p),
- getVersions:s=>invoke('minecraft:versions',s),installLoader:o=>invoke('minecraft:install-loader',o),importOptifine:()=>invoke('minecraft:import-optifine'),folders:()=>invoke('minecraft:folders'),launchMinecraft:o=>invoke('minecraft:launch',o),smartPlay:o=>invoke('biner:smart-play',o),minecraftStatus:()=>invoke('minecraft:status'),serverStatus:o=>invoke('server:status',o),checkForUpdates:async()=>{try{const current=await invoke('app:get-version');const r=await fetch('https://binercraft.ir/cdn/latest.json',{cache:'no-store'});if(!r.ok)throw new Error(`HTTP ${r.status}`);const m=await r.json();const parse=v=>{const x=String(v||'').replace(/^v/i,'').match(/^(\d+)\.(\d+)\.(\d+)/);return x?[+x[1],+x[2],+x[3]]:null};const a=parse(m.version),b=parse(current);if(!a||!b)throw new Error('Invalid version');let c=0;for(let i=0;i<3;i++){if(a[i]!==b[i]){c=a[i]>b[i]?1:-1;break}}return{update:c>0,currentVersion:current,version:String(m.version||'').replace(/^v/i,''),url:m.download||m.url,notes:m.releaseNotes||m.notes||''}}catch(e){return{update:false,error:e.message}}},
- getCrashReports:()=>invoke('app:crash-reports'),openCrashReports:()=>invoke('app:open-crash-reports'),analyzeCrash:i=>invoke('biner:crash:analyze',i),repairScan:()=>invoke('biner:repair:scan'),repairFix:()=>invoke('biner:repair:fix'),compatibleLoaders:v=>invoke('biner:loaders:compatible',v),fastPresets:o=>invoke('biner:fast-mode:presets',o),downloadStart:o=>invoke('biner:download:start',o),downloadCancel:id=>invoke('biner:download:cancel',id),activeDownloads:()=>invoke('biner:download:active'),accounts:{list:()=>invoke('biner:accounts:list'),addLocal:n=>invoke('biner:accounts:add-local',n),activate:id=>invoke('biner:accounts:activate',id),delete:id=>invoke('biner:accounts:delete',id)},
- setZoom:v=>invoke('ui:set-zoom',v),getZoom:()=>invoke('ui:get-zoom'),onProgress:cb=>ipcRenderer.on('launcher:progress',(_,d)=>cb(d)),onLog:cb=>ipcRenderer.on('launcher:log',(_,d)=>cb(d)),onCrash:cb=>ipcRenderer.on('launcher:crash',(_,d)=>cb(d)),onSmartStep:cb=>ipcRenderer.on('smart-play:step',(_,d)=>cb(d)),onDownloadProgress:cb=>ipcRenderer.on('download:progress',(_,d)=>cb(d)),
- window:{minimize:()=>ipcRenderer.send('window:minimize'),maximize:()=>ipcRenderer.send('window:maximize'),close:()=>ipcRenderer.send('window:close')}
-})
-contextBridge.exposeInMainWorld('binerCore',{instances:{list:()=>invoke('biner:instances:list'),create:o=>invoke('biner:instances:create',o),delete:id=>invoke('biner:instances:delete',id),open:id=>invoke('biner:instances:open',id)},mods:{list:id=>invoke('biner:mods:list',id),search:q=>invoke('biner:mods:search',q),install:o=>invoke('biner:mods:install',o)},worlds:{list:id=>invoke('biner:worlds:list',id),delete:o=>invoke('biner:worlds:delete',o)},backups:{create:o=>invoke('biner:backups:create',o),list:()=>invoke('biner:backups:list'),restore:o=>invoke('biner:backups:restore',o)},resources:{list:o=>invoke('biner:resources:list',o)},storageStats:()=>invoke('biner:storage:stats'),diagnostics:()=>invoke('biner:diagnostics'),fileHash:f=>invoke('biner:file-hash',f)})
-window.addEventListener('DOMContentLoaded',()=>{
- const grid=document.querySelector('.loader-grid');if(grid&&!grid.querySelector('[data-loader="neoforge"]')){const card=document.createElement('article');card.className='loader-card neoforge';card.innerHTML='<div class="loader-logo">N</div><b>NEOFORGE</b><h3>NeoForge</h3><p>مدرن، سریع و مناسب مودهای نسل جدید Minecraft.</p><button class="primary loader-install" data-loader="neoforge">نصب NeoForge</button>';grid.appendChild(card)}
- const launcherPanel=document.querySelector('.setting-panel[data-panel="launcher"]');if(launcherPanel&&!document.querySelector('#guiScaleControl')){const c=document.createElement('div');c.id='guiScaleControl';c.style.cssText='margin-top:18px;padding:18px 20px;border:1px solid #ffffff12;border-radius:17px;background:#ffffff04';c.innerHTML='<b>GUI SCALE</b><div style="display:flex;gap:12px;align-items:center;margin-top:12px"><span>70%</span><input id="guiScaleInput" type="range" min="70" max="140" step="5" value="100" style="flex:1"><span>140%</span></div><strong id="guiScaleValue" style="display:block;margin-top:8px">100%</strong>';launcherPanel.appendChild(c);const input=c.querySelector('#guiScaleInput'),value=c.querySelector('#guiScaleValue');const apply=async p=>{const safe=Math.max(70,Math.min(140,Number(p)||100));input.value=safe;value.textContent=`${safe}%`;await invoke('ui:set-zoom',safe/100)};invoke('ui:get-zoom').then(z=>apply(Math.round((Number(z)||1)*100)));input.addEventListener('input',()=>apply(input.value))}
- const smart=document.createElement('div');smart.id='smartPlayStatus';smart.style.cssText='position:fixed;left:50%;bottom:26px;transform:translateX(-50%);padding:10px 18px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(7,11,20,.94);backdrop-filter:blur(14px);color:#fff;font:600 13px Arial,sans-serif;z-index:9999;display:none;box-shadow:0 12px 40px rgba(0,0,0,.35)';document.body.appendChild(smart)
- const runSmart=async()=>{const profile=await invoke('profile:get')||{};if(!profile.username){document.querySelector('#accountModal')?.classList.remove('hidden');return}smart.style.display='block';smart.textContent='SMART PLAY • Checking…';try{await invoke('biner:smart-play',profile);smart.textContent='SMART PLAY • Ready ✓';await new Promise(r=>setTimeout(r,350));smart.textContent='SMART PLAY • Launching…';await invoke('minecraft:launch',profile);smart.textContent='SMART PLAY • Minecraft launched ✓';setTimeout(()=>smart.style.display='none',1800)}catch(e){smart.textContent=`SMART PLAY • ${e?.message||e}`;setTimeout(()=>smart.style.display='none',3500)}}
- document.addEventListener('click',e=>{const b=e.target.closest('#playBtn,#previewPlay');if(b){e.preventDefault();e.stopImmediatePropagation();runSmart()}},true)
- const fastModeObserver=new MutationObserver(()=>{const row=[...document.querySelectorAll('.toggle-row')].find(x=>x.textContent.includes('Fast Launch'));if(!row||row.querySelector('#fastModeInput'))return;const input=document.createElement('input');input.type='checkbox';input.id='fastModeInput';input.style.cssText='width:18px;height:18px;cursor:pointer;accent-color:#7c5cff;margin-inline-start:12px';row.appendChild(input);invoke('profile:get').then(p=>input.checked=p?.fastMode!==false);input.addEventListener('change',async()=>{const p=await invoke('profile:get')||{};p.fastMode=input.checked;await invoke('profile:save',p)})});fastModeObserver.observe(document.documentElement,{childList:true,subtree:true})
 
- // BinerLauncher Font Awesome icon layer. Font Awesome is bundled locally for offline/installed builds.
- try{
-  const cssPath=require.resolve('@fortawesome/fontawesome-free/css/all.min.css')
-  const link=document.createElement('link');link.rel='stylesheet';link.href=pathToFileURL(cssPath).href;document.head.appendChild(link)
- }catch(e){console.warn('BinerLauncher Font Awesome CSS unavailable:',e)}
- const iconClasses={
-  home:'fa-house',versions:'fa-layer-group',instances:'fa-table-cells-large',loader:'fa-puzzle-piece',news:'fa-newspaper',settings:'fa-gear',developer:'fa-code',play:'fa-play',store:'fa-arrow-up-right-from-square',version:'fa-cube',profile:'fa-user',boost:'fa-bolt',search:'fa-magnifying-glass',refresh:'fa-rotate',add:'fa-plus',folder:'fa-folder-open',java:'fa-mug-hot',tools:'fa-screwdriver-wrench',console:'fa-terminal',clear:'fa-trash-can',export:'fa-download',world:'fa-earth-americas',resource:'fa-palette',server:'fa-server',update:'fa-arrows-rotate',crash:'fa-triangle-exclamation',pack:'fa-box-open',close:'fa-xmark',maximize:'fa-up-right-and-down-left-from-center',minimize:'fa-minus'
- }
- const svg=(name)=>{const el=document.createElement('i');el.className=`fa-solid ${iconClasses[name]||iconClasses.tools} biner-fa-icon`;el.setAttribute('aria-hidden','true');return el}
- const style=document.createElement('style');style.textContent='.biner-fa-icon{display:inline-flex;align-items:center;justify-content:center;width:18px;min-width:18px;height:1em;line-height:1;flex:0 0 18px;color:currentColor;vertical-align:-.08em}.nav-item .biner-fa-icon{width:17px;min-width:17px;flex-basis:17px;margin-inline-end:2px}.quick-icon .biner-fa-icon{width:17px;min-width:17px}.pc h3 .biner-fa-icon,.dev-card .biner-fa-icon,.setting-tab .biner-fa-icon{margin-inline-end:6px}.play-main .biner-fa-icon{margin-inline-end:6px}.search-box .biner-fa-icon{width:16px;min-width:16px}.toolbar .biner-fa-icon{width:16px;min-width:16px}.primary>.biner-fa-icon,.ghost>.biner-fa-icon{margin-inline-end:6px}.biner-fa-icon{pointer-events:none}';document.head.appendChild(style)
- const leading={
-  '⌂':['nav-item','home'],'◈':['nav-item','versions'],'▦':['nav-item','instances'],'🧩':['nav-item','loader'],'◉':['nav-item','news'],'⚙':['nav-item','settings'],'⌘':['nav-item','developer'],'✦':['nav-item','tools'],
-  '▶':['play'],'↗':['store'],'⚡':['boost'],'⌕':['search'],'↻':['refresh'],'＋':['add'],'📁':['folder'],'🛠':['tools'],'▣':['console'],'☕':['java'],'♻':['clear'],'⇩':['export'],'🌐':['server'],'📦':['pack'],'🌍':['world'],'🎨':['resource'],'🔎':['crash'],'🔄':['update'],'✓':['clear']
- }
- const scan=()=>{document.querySelectorAll('button,.quick-icon,.news-icon,h3,.search-box').forEach(el=>{if(el.querySelector('.biner-fa-icon'))return;const walker=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);let n;while(n=walker.nextNode()){const t=n.nodeValue;const key=Object.keys(leading).find(k=>t.trimStart().startsWith(k));if(!key)continue;const idx=t.indexOf(key);if(idx<0)continue;n.nodeValue=t.slice(0,idx)+t.slice(idx+key.length);const icon=svg(leading[key][1]);n.parentNode.insertBefore(icon,n);break}})};
- scan();new MutationObserver(scan).observe(document.body,{childList:true,subtree:true});
+const invoke = (channel, ...args) => ipcRenderer.invoke(channel, ...args)
+const listen = (channel, callback) => {
+  if (typeof callback !== 'function') return () => {}
+  const handler = (_event, data) => callback(data)
+  ipcRenderer.on(channel, handler)
+  return () => ipcRenderer.removeListener(channel, handler)
+}
+
+contextBridge.exposeInMainWorld('biner', {
+  appVersion: () => invoke('app:get-version'),
+  openExternal: url => invoke('app:open-external', url),
+  openFolder: target => invoke('app:open-folder', target),
+  toggleDevTools: open => invoke('app:toggle-devtools', open),
+  clearCache: () => invoke('app:clear-cache'),
+  getProfile: () => invoke('profile:get'),
+  saveProfile: profile => invoke('profile:save', profile),
+  getVersions: snapshots => invoke('minecraft:versions', snapshots),
+  installLoader: options => invoke('minecraft:install-loader', options),
+  importOptifine: () => invoke('minecraft:import-optifine'),
+  folders: () => invoke('minecraft:folders'),
+  launchMinecraft: options => invoke('minecraft:launch', options),
+  smartPlay: options => invoke('biner:smart-play', options),
+  minecraftStatus: () => invoke('minecraft:status'),
+  serverStatus: options => invoke('server:status', options),
+  checkForUpdates: () => invoke('app:check-updates'),
+  getCrashReports: () => invoke('app:crash-reports'),
+  openCrashReports: () => invoke('app:open-crash-reports'),
+  analyzeCrash: input => invoke('biner:crash:analyze', input),
+  repairScan: () => invoke('biner:repair:scan'),
+  repairFix: () => invoke('biner:repair:fix'),
+  compatibleLoaders: version => invoke('biner:loaders:compatible', version),
+  fastPresets: options => invoke('biner:fast-mode:presets', options),
+  downloadStart: options => invoke('biner:download:start', options),
+  downloadCancel: id => invoke('biner:download:cancel', id),
+  activeDownloads: () => invoke('biner:download:active'),
+  accounts: {
+    list: () => invoke('biner:accounts:list'),
+    addLocal: username => invoke('biner:accounts:add-local', username),
+    activate: id => invoke('biner:accounts:activate', id),
+    delete: id => invoke('biner:accounts:delete', id)
+  },
+  setZoom: value => invoke('ui:set-zoom', value),
+  getZoom: () => invoke('ui:get-zoom'),
+  onProgress: callback => listen('launcher:progress', callback),
+  onLog: callback => listen('launcher:log', callback),
+  onCrash: callback => listen('launcher:crash', callback),
+  onSmartStep: callback => listen('smart-play:step', callback),
+  onDownloadProgress: callback => listen('download:progress', callback),
+  window: {
+    minimize: () => ipcRenderer.send('window:minimize'),
+    maximize: () => ipcRenderer.send('window:maximize'),
+    close: () => ipcRenderer.send('window:close')
+  }
+})
+
+contextBridge.exposeInMainWorld('binerCore', {
+  instances: {
+    list: () => invoke('biner:instances:list'),
+    create: options => invoke('biner:instances:create', options),
+    delete: id => invoke('biner:instances:delete', id),
+    open: id => invoke('biner:instances:open', id)
+  },
+  mods: {
+    list: id => invoke('biner:mods:list', id),
+    search: query => invoke('biner:mods:search', query),
+    install: options => invoke('biner:mods:install', options)
+  },
+  worlds: {
+    list: id => invoke('biner:worlds:list', id),
+    delete: options => invoke('biner:worlds:delete', options)
+  },
+  backups: {
+    create: options => invoke('biner:backups:create', options),
+    list: () => invoke('biner:backups:list'),
+    restore: options => invoke('biner:backups:restore', options)
+  },
+  resources: { list: options => invoke('biner:resources:list', options) },
+  storageStats: () => invoke('biner:storage:stats'),
+  diagnostics: () => invoke('biner:diagnostics'),
+  fileHash: file => invoke('biner:file-hash', file)
+})
+
+window.addEventListener('DOMContentLoaded', () => {
+  try {
+    const cssPath = require.resolve('@fortawesome/fontawesome-free/css/all.min.css')
+    const link = document.createElement('link')
+    link.rel = 'stylesheet'
+    link.href = pathToFileURL(cssPath).href
+    document.head.appendChild(link)
+  } catch (error) {
+    console.warn('[BinerLauncher] Font Awesome unavailable:', error)
+  }
 })
