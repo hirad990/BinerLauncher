@@ -8,6 +8,14 @@ const AdmZip = require('adm-zip')
 
 const DEFAULT_JAVA = 21
 
+function logJava(level, message, error = null, extra = null) {
+  const prefix = '[BinerLauncher][Java]'
+  const details = extra ? ` ${JSON.stringify(extra)}` : ''
+  if (level === 'error') console.error(`${prefix} ${message}${details}`, error?.stack || error || '')
+  else if (level === 'warn') console.warn(`${prefix} ${message}${details}`, error?.message || error || '')
+  else console.log(`${prefix} ${message}${details}`)
+}
+
 function requiredJavaForMinecraft(version) {
   const value = String(version || '').trim()
   const modern = value.match(/^1\.(\d+)(?:\.(\d+))?$/)
@@ -19,13 +27,9 @@ function requiredJavaForMinecraft(version) {
   const minor = Number(modern[1])
   const patch = Number(modern[2] || 0)
 
-  // Legacy Minecraft/LaunchWrapper requires Java 8.
   if (minor <= 16) return 8
-  // Minecraft 1.17 through 1.20.4 requires Java 17.
   if (minor < 20 || (minor === 20 && patch <= 4)) return 17
-  // Minecraft 1.20.5 through 1.21.x requires Java 21.
   if (minor <= 21) return 21
-  // Newer versions such as 26.1 use Java 25.
   return 25
 }
 
@@ -110,22 +114,43 @@ async function installManagedJava(userData, requiredJava, onProgress) {
   fs.mkdirSync(root, { recursive: true })
   const archive = path.join(root, `temurin${requiredJava}.zip`)
   const url = `https://api.adoptium.net/v3/binary/latest/${requiredJava}/ga/windows/x64/jre/hotspot/normal/eclipse`
-  await download(url, archive, onProgress)
-  const zip = new AdmZip(archive)
-  zip.extractAllTo(root, true)
-  fs.unlinkSync(archive)
-  const runtime = await findManagedJava(userData, requiredJava)
-  if (!runtime) throw new Error(`Java ${requiredJava} نصب شد اما فایل java.exe پیدا نشد.`)
-  return runtime
+  logJava('info', `Installing Java ${requiredJava} from Adoptium`, null, { url, destination: root })
+  try {
+    await download(url, archive, onProgress)
+    const zip = new AdmZip(archive)
+    zip.extractAllTo(root, true)
+    fs.unlinkSync(archive)
+    const runtime = await findManagedJava(userData, requiredJava)
+    if (!runtime) throw new Error(`Java ${requiredJava} نصب شد اما فایل java.exe پیدا نشد.`)
+    logJava('info', `Java ${requiredJava} installed successfully`, null, { path: runtime.path })
+    return runtime
+  } catch (error) {
+    logJava('error', `Java ${requiredJava} installation failed`, error, { url, archive })
+    try { if (fs.existsSync(archive)) fs.unlinkSync(archive) } catch {}
+    throw error
+  }
 }
 
 async function ensureJava(userData, onProgress, minecraftVersion) {
   const requiredJava = requiredJavaForMinecraft(minecraftVersion)
-  const managed = await findManagedJava(userData, requiredJava)
-  if (managed) return managed
-  const system = await findSuitableJava(requiredJava)
-  if (system) return system
-  return installManagedJava(userData, requiredJava, onProgress)
+  logJava('info', `Checking Java runtime`, null, { minecraftVersion, requiredJava })
+  try {
+    const managed = await findManagedJava(userData, requiredJava)
+    if (managed) {
+      logJava('info', `Using managed Java ${requiredJava}`, null, { path: managed.path })
+      return managed
+    }
+    const system = await findSuitableJava(requiredJava)
+    if (system) {
+      logJava('info', `Using system Java ${requiredJava}`, null, { path: system.path })
+      return system
+    }
+    logJava('warn', `Java ${requiredJava} was not found; installing managed runtime`)
+    return installManagedJava(userData, requiredJava, onProgress)
+  } catch (error) {
+    logJava('error', `Java check failed for Minecraft ${minecraftVersion}`, error, { requiredJava })
+    throw error
+  }
 }
 
 module.exports = { ensureJava, requiredJavaForMinecraft, DEFAULT_JAVA }
