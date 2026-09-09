@@ -16,7 +16,8 @@
   },
   "dependencies": {
     "minecraft-launcher-core": "^3.18.2",
-    "adm-zip": "^0.5.16"
+    "adm-zip": "^0.5.16",
+    "@fortawesome/fontawesome-free": "^7.0.0"
   },
   "devDependencies": {
     "electron": "^38.1.0",
