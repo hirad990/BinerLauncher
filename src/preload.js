@@ -34,27 +34,46 @@ window.addEventListener('DOMContentLoaded', () => {
     grid.appendChild(card)
   }
 
+  // Biner icon system: replace emoji/text glyphs with crisp inline SVG icons.
   const icons = {
     '🧩': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h3v3h2V3h3a2 2 0 0 1 2 2v3h3v3h-3v2h3v3h-3v3a2 2 0 0 1-2 2h-3v-3H9v3H6a2 2 0 0 1-2-2v-3H1v-3h3V9H1V6h3V5a2 2 0 0 1 2-2h2v3h0V3Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>',
-    '⚙': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6Zm8.2 3.8c0-.5-.1-1-.2-1.5l2-1.5-2-3.4-2.3 1a8.4 8.4 0 0 0-2.6-1.5L14.8 3h-4l-.3 2.1a8.4 8.4 0 0 0-2.6 1.5l-2.3-1-2 3.4 2 3.4 2.3-1a8.4 8.4 0 0 0 2.6 1.5l.3 2.1h4l.3-2.1a8.4 8.4 0 0 0 2.6-1.5l2.3 1 2-3.4-2-1.5c.1-.5.2-1 .2-1.5Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
+    '⚙': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6Zm8.2 3.8c0-.5-.1-1-.2-1.5l-2-1.5 2-3.4-3.3-2-1.5 2.1a8.4 8.4 0 0 0-2.6-1.5L12.5 3h-1l-.3 2.1a8.4 8.4 0 0 0-2.6 1.5L6.3 4.5l-2 3.4 2 1.5c-.1.5-.2 1-.2 1.5s.1 1 .2 1.5l-2 1.5 2 3.4 2.3-1a8.4 8.4 0 0 0 2.6 1.5l.3 2.1h4l.3-2.1a8.4 8.4 0 0 0 2.6-1.5l2.3 1 2-3.4-2-1.5c.1-.5.2-1 .2-1.5Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
     '📁': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A2.5 2.5 0 0 1 5.5 4H10l2 2h6.5A2.5 2.5 0 0 1 21 8.5v8A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5v-10Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>',
     '🛠': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6.5 3-3 3 3-3 3m-2-2-8.8 8.8a2.1 2.1 0 0 0 0 3l.1.1a2.1 2.1 0 0 0 3 0L18 10.5M5 5l3.5 3.5M4 20l3-3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     '☕': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h12v6a5 5 0 0 1-5 5H10a5 5 0 0 1-5-5V8Zm12 2h1.5a2.5 2.5 0 0 1 0 5H17M8 4c0 1 1 1 1 2M12 4c0 1 1 1 1 2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
-    '♻': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 4 3 3-3 3M5 10a7 7 0 0 1 12-4l1 1M16 20l-3-3 3-3M19 14a7 7 0 0 1-12 4l-1-1" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    '♻': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 4 3 3-3 3M5 10a7 7 0 0 1 12-4l1 1M16 20l-3-3 3-3M19 14a7 7 0 0 1-12 4l-1-1" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    '⌂': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 11 9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+    '◈': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 9-8 9-8-9 8-9Z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="m12 7 4 5-4 5-4-5 4-5Z" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>',
+    '▦': '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="14" y="4" width="6" height="6" rx="1" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="4" y="14" width="6" height="6" rx="1" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="14" y="14" width="6" height="6" rx="1" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
+    '◉': '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>',
+    '⌘': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9V7a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3v10a3 3 0 1 0 3 3H6a3 3 0 1 0 3-3V9Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
+    '▶': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z" fill="currentColor"/></svg>',
+    '↗': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    '↻': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.8-4L3 10m0 0V5m0 5h5M4 13a8 8 0 0 0 14.8 4L21 14m0 0v5m0-5h-5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+    '⚡': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m13 2-9 12h7l-1 8 9-12h-7l1-8Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+    '⌕': '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="m16 16 5 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+    '＋': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    '▣': '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="8" y="8" width="8" height="8" fill="currentColor" opacity=".22"/></svg>',
+    '◇': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 9-8 9-8-9 8-9Z" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>',
+    '⇩': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12m0 0 5-5m-5 5-5-5M5 20h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    '›': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    '✓': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
   }
 
   const style = document.createElement('style')
-  style.textContent = '.biner-svg-icon{display:inline-flex;width:16px;height:16px;flex:0 0 16px;align-items:center;justify-content:center;vertical-align:middle}.biner-svg-icon svg{display:block;width:16px;height:16px}.dev-card .biner-svg-icon{width:18px;height:18px;flex-basis:18px}.dev-card .biner-svg-icon svg{width:18px;height:18px}.nav-item .biner-svg-icon{width:17px;height:17px;flex-basis:17px}.nav-item .biner-svg-icon svg{width:17px;height:17px}'
+  style.textContent = '.biner-svg-icon{display:inline-flex;width:16px;height:16px;flex:0 0 16px;align-items:center;justify-content:center;vertical-align:middle}.biner-svg-icon svg{display:block;width:100%;height:100%}.nav-item .biner-svg-icon{width:17px;height:17px;flex-basis:17px}.settings-nav .biner-svg-icon{width:15px;height:15px;flex-basis:15px}.dev-card .biner-svg-icon{width:18px;height:18px;flex-basis:18px}.primary .biner-svg-icon,.ghost .biner-svg-icon{margin-inline-end:4px}.play-main .biner-svg-icon{width:15px;height:15px;flex-basis:15px}'
   document.head.appendChild(style)
 
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
   const nodes = []
   while (walker.nextNode()) nodes.push(walker.currentNode)
+  const glyphs = Object.keys(icons)
   for (const node of nodes) {
-    if (!node.nodeValue || !Object.keys(icons).some(key => node.nodeValue.includes(key))) continue
+    if (!node.nodeValue || !glyphs.some(key => node.nodeValue.includes(key))) continue
     const parent = node.parentElement
-    if (!parent || parent.tagName === 'SCRIPT' || parent.tagName === 'STYLE') continue
-    let html = node.nodeValue.replace(/[🧩⚙📁🛠☕♻]/gu, match => `@@BINER_ICON_${encodeURIComponent(match)}@@`)
+    if (!parent || parent.tagName === 'SCRIPT' || parent.tagName === 'STYLE' || parent.closest('.biner-svg-icon')) continue
+    let html = node.nodeValue
+    for (const key of glyphs) html = html.split(key).join(`@@BINER_ICON_${encodeURIComponent(key)}@@`)
     html = html.replace(/@@BINER_ICON_([^@]+)@@/g, (_, encoded) => `<span class="biner-svg-icon">${icons[decodeURIComponent(encoded)]}</span>`)
     const holder = document.createElement('span')
     holder.innerHTML = html
