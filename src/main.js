@@ -29,6 +29,34 @@ function createWindow() {
     const profile = readProfile()
     const zoom = Math.max(0.7, Math.min(1.4, Number(profile?.zoom) || 1))
     mainWindow.webContents.setZoomFactor(zoom)
+    mainWindow.webContents.executeJavaScript(`
+      (() => {
+        const overlay = document.getElementById('progressOverlay')
+        const card = overlay?.querySelector('.progress-card')
+        if (!overlay || !card || document.getElementById('progressCloseButton')) return
+
+        const close = document.createElement('button')
+        close.id = 'progressCloseButton'
+        close.type = 'button'
+        close.setAttribute('aria-label', 'Close download progress')
+        close.textContent = '×'
+        close.style.cssText = 'position:absolute;top:12px;right:14px;width:34px;height:34px;border:1px solid rgba(255,255,255,.12);border-radius:10px;background:rgba(255,255,255,.05);color:#fff;font:600 22px/30px Arial,sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:20;transition:background .18s ease,transform .18s ease;'
+        close.onmouseenter = () => { close.style.background='rgba(255,255,255,.12)'; close.style.transform='scale(1.05)' }
+        close.onmouseleave = () => { close.style.background='rgba(255,255,255,.05)'; close.style.transform='scale(1)' }
+        close.onclick = () => { window.__binerProgressDismissed = true; overlay.classList.add('hidden') }
+        card.style.position = 'relative'
+        card.appendChild(close)
+
+        const resetDismissed = () => { window.__binerProgressDismissed = false }
+        document.getElementById('playBtn')?.addEventListener('click', resetDismissed)
+        document.getElementById('previewPlay')?.addEventListener('click', resetDismissed)
+
+        const observer = new MutationObserver(() => {
+          if (window.__binerProgressDismissed && !overlay.classList.contains('hidden')) overlay.classList.add('hidden')
+        })
+        observer.observe(overlay, { attributes: true, attributeFilter: ['class'] })
+      })()
+    `).catch(() => {})
   })
   mainWindow.once('ready-to-show', () => mainWindow.show())
   if (isDev) mainWindow.webContents.openDevTools({ mode: 'detach' })
