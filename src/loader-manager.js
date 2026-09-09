@@ -13,6 +13,7 @@ async function json(url) {
 async function download(url, target, onProgress = () => {}) {
   const res = await fetch(url, { headers: { 'User-Agent': UA } })
   if (!res.ok) throw new Error(`HTTP ${res.status} while downloading ${url}`)
+  if (!res.body) throw new Error('Download stream unavailable.')
   fs.mkdirSync(path.dirname(target), { recursive: true })
   const total = Number(res.headers.get('content-length')) || 0
   const temp = `${target}.part`
@@ -21,11 +22,10 @@ async function download(url, target, onProgress = () => {}) {
   try {
     for await (const chunk of res.body) {
       received += chunk.length
-      file.write(chunk)
+      if (!file.write(chunk)) await new Promise(resolve => file.once('drain', resolve))
       onProgress(total ? Math.round(received / total * 100) : 0, received, total)
     }
-    file.end()
-    await new Promise((resolve, reject) => { file.on('finish', resolve); file.on('error', reject) })
+    await new Promise((resolve, reject) => file.end(error => error ? reject(error) : resolve()))
     fs.renameSync(temp, target)
   } catch (e) {
     file.destroy()
@@ -77,8 +77,10 @@ function neoChannelForMinecraft(version) {
   if (!m) return null
   const minor = Number(m[1])
   const patch = Number(m[2] || 0)
-  if (minor < 21) return null
-  return patch ? `21.${minor}.${patch}` : `21.${minor}`
+  // NeoForge versions mirror Minecraft 1.21.x as 21.x.y.
+  // Example: MC 1.21.1 -> NeoForge 21.1.x; MC 1.21.11 -> 21.11.x.
+  if (minor !== 21) return null
+  return patch ? `21.${patch}` : '21.0'
 }
 
 async function installNeoForge({ root, minecraftVersion, javaPath, onProgress = () => {} }) {
