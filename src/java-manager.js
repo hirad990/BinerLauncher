@@ -9,16 +9,24 @@ const AdmZip = require('adm-zip')
 const DEFAULT_JAVA = 21
 
 function requiredJavaForMinecraft(version) {
-  const value = String(version || '')
-  const match = value.match(/^1\.(\d+)(?:\.(\d+))?$/)
-  if (!match) return DEFAULT_JAVA
-  const minor = Number(match[1])
-  const patch = Number(match[2] || 0)
-  // Minecraft 1.20.5+ and all 1.21.x require Java 21.
-  // 1.20.4 and older modern releases use Java 17.
-  if (minor < 20) return 17
-  if (minor === 20 && patch <= 4) return 17
-  return 21
+  const value = String(version || '').trim()
+  const modern = value.match(/^1\.(\d+)(?:\.(\d+))?$/)
+  if (!modern) {
+    if (/^(?:2[6-9]|[3-9]\d)\./.test(value)) return 25
+    return DEFAULT_JAVA
+  }
+
+  const minor = Number(modern[1])
+  const patch = Number(modern[2] || 0)
+
+  // Legacy Minecraft/LaunchWrapper requires Java 8.
+  if (minor <= 16) return 8
+  // Minecraft 1.17 through 1.20.4 requires Java 17.
+  if (minor < 20 || (minor === 20 && patch <= 4)) return 17
+  // Minecraft 1.20.5 through 1.21.x requires Java 21.
+  if (minor <= 21) return 21
+  // Newer versions such as 26.1 use Java 25.
+  return 25
 }
 
 function execVersion(javaPath) {
@@ -26,7 +34,7 @@ function execVersion(javaPath) {
     execFile(javaPath, ['-version'], { windowsHide: true }, (error, stdout, stderr) => {
       if (error) return resolve(null)
       const text = `${stdout || ''}\n${stderr || ''}`
-      const match = text.match(/version\s+"(\d+)(?:\.(\d+))?/) || text.match(/openjdk\s+(\d+)(?:\.(\d+))?/)
+      const match = text.match(/version\s+["'](\d+)(?:\.(\d+))?/) || text.match(/openjdk\s+(\d+)(?:\.(\d+))?/)
       resolve(match ? Number(match[1]) : null)
     })
   })
@@ -38,7 +46,7 @@ function existingCandidates(requiredJava) {
   if (process.platform === 'win32') {
     candidates.push(`C:\\Program Files\\Java\\jdk-${requiredJava}\\bin\\java.exe`)
     candidates.push(`C:\\Program Files\\Eclipse Adoptium\\jdk-${requiredJava}\\bin\\java.exe`)
-    candidates.push(`C:\\Program Files\\Eclipse Adoptium\\jdk-${requiredJava}\\*\\bin\\java.exe`)
+    candidates.push(`C:\\Program Files\\Eclipse Adoptium\\jre-${requiredJava}\\bin\\java.exe`)
   }
   candidates.push(process.platform === 'win32' ? 'java.exe' : 'java')
   return [...new Set(candidates)]
@@ -46,7 +54,6 @@ function existingCandidates(requiredJava) {
 
 async function findSuitableJava(requiredJava) {
   for (const candidate of existingCandidates(requiredJava)) {
-    if (candidate.includes('*')) continue
     const version = await execVersion(candidate)
     if (version === requiredJava) return { path: candidate, version, managed: false }
   }
@@ -78,7 +85,10 @@ function download(url, destination, onProgress) {
         response.resume()
         return download(new URL(response.headers.location, url).toString(), destination, onProgress).then(resolve, reject)
       }
-      if (response.statusCode !== 200) return reject(new Error(`Java download failed: HTTP ${response.statusCode}`))
+      if (response.statusCode !== 200) {
+        response.resume()
+        return reject(new Error(`Java download failed: HTTP ${response.statusCode}`))
+      }
       const total = Number(response.headers['content-length'] || 0)
       let received = 0
       const file = createWriteStream(destination)
