@@ -22,3 +22,13 @@ contextBridge.exposeInMainWorld('biner', {
   onCrash: callback => ipcRenderer.on('launcher:crash', (_, data) => callback(data)),
   window: { minimize: () => ipcRenderer.send('window:minimize'), maximize: () => ipcRenderer.send('window:maximize'), close: () => ipcRenderer.send('window:close') }
 })
+
+// Keep the loader hub in sync with the backend without requiring a renderer rewrite.
+window.addEventListener('DOMContentLoaded', () => {
+  const grid = document.querySelector('.loader-grid')
+  if (!grid || grid.querySelector('[data-loader="neoforge"]')) return
+  const card = document.createElement('article')
+  card.className = 'loader-card neoforge'
+  card.innerHTML = '<div class="loader-logo">N</div><b>NEOFORGE</b><h3>NeoForge</h3><p>مدرن، سریع و مناسب مودهای نسل جدید Minecraft.</p><button class="primary loader-install" data-loader="neoforge">نصب NeoForge</button>'
+  grid.appendChild(card)
+})
