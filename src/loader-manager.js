@@ -2,7 +2,7 @@ const fs = require('fs')
 const path = require('path')
 const { spawn } = require('child_process')
 
-const UA = 'BinerLauncher/0.3.0'
+const UA = 'BinerLauncher/0.3.1'
 
 async function json(url) {
   const res = await fetch(url, { headers: { 'User-Agent': UA } })
@@ -72,13 +72,23 @@ async function installForge({ root, minecraftVersion, javaPath, onProgress = () 
   return { loader: 'forge', loaderVersion: forgeVersion, profileId: `forge-${minecraftVersion}-${forgeVersion}` }
 }
 
+function neoChannelForMinecraft(version) {
+  const m = String(version).match(/^1\.(\d+)(?:\.(\d+))?$/)
+  if (!m) return null
+  const minor = Number(m[1])
+  const patch = Number(m[2] || 0)
+  if (minor < 21) return null
+  return patch ? `21.${minor}.${patch}` : `21.${minor}`
+}
+
 async function installNeoForge({ root, minecraftVersion, javaPath, onProgress = () => {} }) {
-  const data = await json(`https://maven.neoforged.net/api/maven/latest/releases/net/neoforged/neoforge`)
-  const latest = data?.version
-  if (!latest) throw new Error(`NeoForge برای Minecraft ${minecraftVersion} پیدا نشد.`)
   const versionMap = await json('https://maven.neoforged.net/api/maven/details/releases/net/neoforged/neoforge')
-  const candidates = (versionMap?.versions || []).filter(v => String(v).includes(String(minecraftVersion)))
-  const neoVersion = candidates[candidates.length - 1] || latest
+  const versions = (versionMap?.versions || []).map(String)
+  if (!versions.length) throw new Error('فهرست نسخه‌های NeoForge در دسترس نیست.')
+  const channel = neoChannelForMinecraft(minecraftVersion)
+  const candidates = channel ? versions.filter(v => v === channel || v.startsWith(`${channel}.`)) : []
+  const neoVersion = candidates.sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).pop()
+  if (!neoVersion) throw new Error(`NeoForge سازگار با Minecraft ${minecraftVersion} پیدا نشد.`)
   const url = `https://maven.neoforged.net/releases/net/neoforged/neoforge/${neoVersion}/neoforge-${neoVersion}-installer.jar`
   const cache = path.join(root, 'cache')
   const installer = path.join(cache, `neoforge-${neoVersion}-installer.jar`)
