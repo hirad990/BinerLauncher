@@ -1,24 +1,18 @@
 const { app } = require('electron')
+
+// Start the launcher first. The updater must never be able to block startup.
+require('./main')
+
 const { runAutoUpdater } = require('./auto-updater')
 
-let started = false
-
-async function boot() {
-  if (started) return
-  started = true
-
-  try {
-    const result = await runAutoUpdater()
-    if (result?.installed) return
-  } catch (error) {
-    console.warn('[BinerBoot] Auto updater failed:', error?.message || error)
-  }
-
-  require('./main')
-}
-
 if (app.isReady()) {
-  boot()
+  setTimeout(() => runAutoUpdater().catch(error => {
+    console.warn('[BinerBoot] Auto updater failed:', error?.message || error)
+  }), 1500)
 } else {
-  app.whenReady().then(boot)
+  app.whenReady().then(() => {
+    setTimeout(() => runAutoUpdater().catch(error => {
+      console.warn('[BinerBoot] Auto updater failed:', error?.message || error)
+    }), 1500)
+  })
 }
