@@ -66,10 +66,10 @@ async function installUpdate(update, onProgress) {
   const filename = `Biner-Launcher-Setup-${update.version}.exe`; const destination = path.join(app.getPath('temp'), 'BinerLauncher', filename)
   try { fs.rmSync(destination, { force: true }) } catch {}
   await downloadFile(update.url, destination, onProgress)
-  if (update.manifest.sha256) {
-    const expected = String(update.manifest.sha256).trim().toLowerCase(); const actual = await sha256(destination)
-    if (!/^[a-f0-9]{64}$/.test(expected) || actual !== expected) { fs.rmSync(destination, { force: true }); throw new Error('SHA-256 verification failed.') }
-  }
+  const expected = String(update.manifest.sha256 || '').trim().toLowerCase()
+  if (!/^[a-f0-9]{64}$/.test(expected)) { fs.rmSync(destination, { force: true }); throw new Error('Update manifest must contain a valid SHA-256.') }
+  const actual = await sha256(destination)
+  if (actual !== expected) { fs.rmSync(destination, { force: true }); throw new Error('SHA-256 verification failed.') }
   if (fs.statSync(destination).size < 1024 * 1024) { fs.rmSync(destination, { force: true }); throw new Error('Downloaded installer is unexpectedly small.') }
   const child = spawn(destination, [], { detached: true, stdio: 'ignore', windowsHide: false }); child.unref(); return destination
 }
