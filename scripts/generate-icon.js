@@ -1,12 +1,20 @@
 const fs = require('fs');
 const path = require('path');
-const pngToIco = require('png-to-ico');
+
+const pngToIcoModule = require('png-to-ico');
+const pngToIco = typeof pngToIcoModule === 'function'
+  ? pngToIcoModule
+  : pngToIcoModule?.default || pngToIcoModule?.pngToIco;
 
 const root = path.resolve(__dirname, '..');
 const input = path.join(root, 'icon.png');
 const output = path.join(root, 'icon.ico');
 
 async function main() {
+  if (typeof pngToIco !== 'function') {
+    throw new Error('Installed png-to-ico package does not expose a callable converter. Run: npm install png-to-ico@1.0.1 --save-exact');
+  }
+
   if (!fs.existsSync(input)) {
     throw new Error(`Missing source icon: ${input}`);
   }
