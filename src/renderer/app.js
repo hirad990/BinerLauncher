@@ -1,27 +1,269 @@
-const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)]
-let state={username:'',version:'1.21.11',memory:4096,loader:'vanilla',profileId:'',serverHost:'Play.BinerCraft.ir',serverPort:25565,width:1280,height:720,fullscreen:false,snapshots:false,developerMode:false,fastMode:true,customArgs:[],instances:[],language:'fa'}
-function toast(m){const e=$('#toast');e.textContent=m;e.classList.add('show');clearTimeout(window.__toast);window.__toast=setTimeout(()=>e.classList.remove('show'),3000)}
-function setSection(n){$$('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.section===n));$$('.section').forEach(x=>x.classList.toggle('hidden-section',x.id!==n));if(n==='versions')loadVersions();if(n==='instances')renderInstances();if(n==='modloaders')loadInstalled()}
-function render(){const name=state.username||'بازیکن مهمان';$('#username').textContent=name;$('#avatar').textContent=name[0]?.toUpperCase()||'G';$('#accountStatus').textContent=state.username?'حساب محلی • آماده اجرا':'حساب محلی • وارد نشده';$('#nameInput').value=state.username;$('#localNameInput').value=state.username;$('#memoryInput').value=state.memory;$('#memorySlider').value=state.memory;$('#ramValue').textContent=`${state.memory} MB`;$('#serverInput').value=state.serverHost;$('#portInput').value=state.serverPort;$('#widthInput').value=state.width;$('#heightInput').value=state.height;$('#fullscreenInput').checked=state.fullscreen;$('#snapshots').checked=state.snapshots;$('#developerToggle').checked=state.developerMode;const fast=$('#fastModeInput');if(fast)fast.checked=state.fastMode!==false;const fastStatus=$('#fastModeStatus');if(fastStatus)fastStatus.textContent=state.fastMode===false?'OFF':'ON';$('#jvmArgs').value=(state.customArgs||[]).join(' ');$('#selectedVersionLabel').textContent=state.version;$('#selectedLoaderLabel').textContent=state.loader.toUpperCase();$('#memoryLabel').textContent=`${state.memory} MB`;$('#previewTitle').textContent=`${state.version} • ${state.loader==='vanilla'?'Vanilla':state.loader}`;$('#playVersion').textContent=`${state.version} • ${state.loader==='vanilla'?'Vanilla':state.loader}`;$('#homeVersion').textContent=state.version;$('#settingsVersion').textContent=state.version;$('#settingsLoader').textContent=state.loader.toUpperCase();$('#settingsJava').textContent='Auto Runtime';$('#sideJava').textContent='JAVA 21';state.instances=JSON.parse(localStorage.getItem('biner.instances')||'[]');renderInstances();applyLanguage()}
-async function persist(){await window.biner.saveProfile(state);$('#saveState').textContent='SAVED ✓';setTimeout(()=>$('#saveState').textContent='SAVED',1200)}
-async function save(){state={...state,username:$('#nameInput').value.trim(),memory:Number($('#memoryInput').value)||4096,serverHost:$('#serverInput').value.trim()||'Play.BinerCraft.ir',serverPort:Number($('#portInput').value)||25565,width:Number($('#widthInput').value)||1280,height:Number($('#heightInput').value)||720,fullscreen:$('#fullscreenInput').checked,developerMode:$('#developerToggle').checked,fastMode:$('#fastModeInput')?$('#fastModeInput').checked:true,customArgs:$('#jvmArgs').value.split(/\s+/).filter(Boolean)};await persist();render();toast(state.language==='en'?'Settings saved ✓':'تنظیمات ذخیره شد ✓')}
-function showProgress(d){$('#progressOverlay').classList.remove('hidden');const p=Math.max(0,Math.min(100,Number(d.progress)||0));$('#progressStage').textContent=(d.stage||'PREPARING').toUpperCase();$('#progressPercent').textContent=`${p}%`;$('#progressBar').style.width=`${p}%`;$('#progressMessage').textContent=d.message||'در حال آماده‌سازی...';$('#progressCurrent').textContent=d.current||'BinerLauncher';$('#progressBytes').textContent=d.received&&d.total?`${(d.received/1048576).toFixed(1)} / ${(d.total/1048576).toFixed(1)} MB`:'—';if(d.stage==='launched'||d.stage==='closed')setTimeout(()=>$('#progressOverlay').classList.add('hidden'),900)}
-async function launch(){if(!state.username){$('#accountModal').classList.remove('hidden');return}$('#playBtn').disabled=true;$('#previewPlay').disabled=true;try{await persist();await window.biner.launchMinecraft({...state,fastMode:state.fastMode!==false})}catch(e){toast(`${state.language==='en'?'Error':'خطا'}: ${e?.message||e}`)}finally{$('#playBtn').disabled=false;$('#previewPlay').disabled=false}}
-let activeFilter='release'
-async function loadVersions(){const box=$('#versionList');box.innerHTML=`<div class="loading">${state.language==='en'?'Loading versions...':'در حال دریافت نسخه‌ها...'}</div>`;try{const list=await window.biner.getVersions(state.snapshots);$('#versionCount').textContent=list.length;const filtered=list.filter(v=>activeFilter==='all'||v.type==='release');box.innerHTML=filtered.map(v=>`<button class="version-item ${v.id===state.version?'selected':''}" data-version="${v.id}"><b>${v.id}</b><small>${v.type.toUpperCase()} • ${new Date(v.releaseTime).toLocaleDateString(state.language==='en'?'en-US':'fa-IR')}</small>${v.id===state.version?`<span class="badge">${state.language==='en'?'SELECTED':'انتخاب‌شده'}</span>`:''}</button>`).join('')||`<div class="loading">${state.language==='en'?'No versions found.':'نسخه‌ای پیدا نشد.'}</div>`;$('#featuredTitle').textContent=list[0]?.id||state.version;$$('.version-item').forEach(x=>x.onclick=()=>selectVersion(x.dataset.version))}catch(e){box.innerHTML=`<div class="loading">${state.language==='en'?'Error':'خطا'}: ${e.message}</div>`}}
-async function selectVersion(v){state.version=v;state.loader='vanilla';state.profileId='';await persist();render();loadVersions();toast(state.language==='en'?`Version ${v} selected ✓`:`نسخه ${v} انتخاب شد ✓`)}
-async function installLoader(loader){try{toast(state.language==='en'?`Installing ${loader} for ${state.version}...`:`در حال نصب ${loader} برای ${state.version}...`);const r=await window.biner.installLoader({loader,version:state.version});state.loader=loader;state.profileId=r.profileId||'';await persist();render();loadInstalled();toast(state.language==='en'?`${loader} installed successfully ✓`:`${loader} با موفقیت نصب شد ✓`)}catch(e){toast(`${state.language==='en'?'Error':'خطا'}: ${e.message}`)}}
-function loadInstalled(){$('#installedLoaders').textContent=`${state.language==='en'?'Active profile':'Profile فعال'}: ${state.loader.toUpperCase()} • ${state.version}`}
-function renderInstances(){const box=$('#instanceGrid'),arr=state.instances||[];if(!arr.length){box.innerHTML=`<div class="instance-card"><div class="instance-top"><div class="instance-icon">B</div><small>DEFAULT</small></div><h3>BinerCraft Main</h3><p>${state.language==='en'?'Main launcher profile with current settings.':'پروفایل اصلی لانچر با تنظیمات فعلی.'}</p><button class="primary" id="defaultInstance">${state.language==='en'?'Use Main Profile':'استفاده از پروفایل اصلی'}</button></div>`;$('#defaultInstance')?.addEventListener('click',launch);return}box.innerHTML=arr.map((x,i)=>`<article class="instance-card"><div class="instance-top"><div class="instance-icon">${(x.name||'B')[0].toUpperCase()}</div><small>INSTANCE ${i+1}</small></div><h3>${escapeHtml(x.name)}</h3><p>${escapeHtml(x.version||state.version)} • ${escapeHtml(x.loader||'vanilla')} • ${x.memory||state.memory} MB</p><button class="primary instance-launch" data-index="${i}">${state.language==='en'?'Launch Profile':'اجرای پروفایل'}</button></article>`).join('');$$('.instance-launch').forEach(b=>b.onclick=()=>{const x=state.instances[Number(b.dataset.index)];state={...state,...x};render();launch()})}
-function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-async function refreshServer(){try{const s=await window.biner.serverStatus({host:state.serverHost,port:state.serverPort});$('#homePing').textContent=s.online?`${s.ping}ms`:'OFFLINE';$('#homePlayers').textContent=s.online?'ONLINE':'OFFLINE';return s}catch{return null}}
-$$('.nav-item').forEach(x=>x.onclick=()=>setSection(x.dataset.section));$('#versionQuick').onclick=()=>setSection('versions');$('#playBtn').onclick=launch;$('#previewPlay').onclick=launch;$('#storeBtn').onclick=()=>window.biner.openExternal('https://binercraft.ir');$('#accountBtn').onclick=()=>$('#accountModal').classList.remove('hidden');$('#accountClose').onclick=()=>$('#accountModal').classList.add('hidden');$('#localLogin').onclick=async()=>{const n=$('#localNameInput').value.trim();if(!/^[A-Za-z0-9_]{3,16}$/.test(n))return toast(state.language==='en'?'Name must be 3-16 characters.':'نام باید 3 تا 16 کاراکتر باشد.');state.username=n;await persist();$('#accountModal').classList.add('hidden');render();toast(state.language==='en'?'Local login completed ✓':'ورود محلی انجام شد ✓')};$('#saveSettings').onclick=save;$('#refreshVersions').onclick=loadVersions;$('#snapshots').onchange=async()=>{state.snapshots=$('#snapshots').checked;await persist();loadVersions()};$('#versionSearch').oninput=e=>$$('.version-item').forEach(x=>x.hidden=!x.dataset.version.toLowerCase().includes(e.target.value.toLowerCase()));$$('.filter').forEach(b=>b.onclick=()=>{$$('.filter').forEach(x=>x.classList.remove('active'));b.classList.add('active');activeFilter=b.dataset.filter;loadVersions()});$('#featuredSelect').onclick=()=>selectVersion($('#featuredTitle').textContent);document.addEventListener('click',e=>{const b=e.target.closest('.loader-install');if(b&&!b.dataset.bound){b.dataset.bound='1';installLoader(b.dataset.loader)}});$('#optifineImport').onclick=async()=>{const p=await window.biner.importOptifine();if(p){toast(state.language==='en'?'OptiFine imported ✓':'OptiFine نصب/وارد شد ✓');state.loader='optifine';await persist();render()}};$$('.setting-tab').forEach(b=>b.onclick=()=>{$$('.setting-tab').forEach(x=>x.classList.remove('active'));$$('.setting-panel').forEach(x=>x.classList.remove('active'));b.classList.add('active');$(`.setting-panel[data-panel="${b.dataset.tab}"]`)?.classList.add('active')});$('#memorySlider').oninput=e=>{$('#ramValue').textContent=`${e.target.value} MB`;$('#memoryInput').value=e.target.value;state.memory=Number(e.target.value)};$('#memoryInput').onchange=e=>{$('#memorySlider').value=e.target.value;$('#ramValue').textContent=`${e.target.value} MB`;state.memory=Number(e.target.value)};$('#resolutionPreset').onchange=e=>{if(e.target.value!=='custom'){const [w,h]=e.target.value.split('x').map(Number);$('#widthInput').value=w;$('#heightInput').value=h}};const fastToggle=$('#fastModeInput');fastToggle?.addEventListener('change',async()=>{state.fastMode=fastToggle.checked;const s=$('#fastModeStatus');if(s)s.textContent=state.fastMode?'ON':'OFF';await persist();toast(state.fastMode?(state.language==='en'?'Fast Launch enabled ✓':'Fast Launch فعال شد ✓'):(state.language==='en'?'Fast Launch disabled ✓':'Fast Launch غیرفعال شد ✓'))});$('#newInstance').onclick=()=>$('#instanceModal').classList.remove('hidden');$('#instanceClose').onclick=()=>$('#instanceModal').classList.add('hidden');$('#createInstance').onclick=()=>{const n=$('#instanceName').value.trim();if(!n)return toast(state.language==='en'?'Enter a profile name.':'نام پروفایل را وارد کن.');const arr=JSON.parse(localStorage.getItem('biner.instances')||'[]');arr.push({name:n,version:state.version,loader:state.loader,memory:state.memory,serverHost:state.serverHost,serverPort:state.serverPort,fastMode:state.fastMode});localStorage.setItem('biner.instances',JSON.stringify(arr));state.instances=arr;$('#instanceModal').classList.add('hidden');$('#instanceName').value='';renderInstances();toast(state.language==='en'?'Instance created ✓':'Instance ساخته شد ✓')};$('#openGameFolder').onclick=()=>window.biner.folders().then(x=>window.biner.openFolder(x.root));$('#checkUpdates').onclick=async()=>{toast(state.language==='en'?'Checking for updates...':'در حال بررسی آپدیت...');const r=await window.biner.checkForUpdates();if(r.update){toast(state.language==='en'?`New version ${r.version} found ✓`:`نسخه جدید ${r.version} پیدا شد ✓`);if(r.url)window.biner.openExternal(r.url)}else toast(r.error?(state.language==='en'?'Update check failed.':'بررسی آپدیت ناموفق بود.'):(state.language==='en'?'You have the latest version ✓':'شما آخرین نسخه را دارید ✓'))};$('#newsRefresh').onclick=async()=>{const s=await refreshServer();toast(s?.online?(state.language==='en'?`BinerCraft Online • ${s.ping}ms ✓`:`BinerCraft Online • ${s.ping}ms ✓`):(state.language==='en'?'Server is unavailable':'سرور در دسترس نیست'))};$('#newsServer').onclick=()=>setSection('home');$('#devtoolsBtn').onclick=()=>window.biner.toggleDevTools(true);$('#logsBtn').onclick=()=>$('#consoleBox').scrollIntoView({behavior:'smooth'});$('#gameFolderBtn').onclick=()=>window.biner.folders().then(x=>window.biner.openFolder(x.root));$('#runtimeFolderBtn').onclick=()=>window.biner.folders().then(x=>window.biner.openFolder(x.runtime));$('#clearCacheBtn').onclick=async()=>toast(await window.biner.clearCache()?(state.language==='en'?'Cache cleared ✓':'Cache پاک شد ✓'):(state.language==='en'?'Cleanup failed':'پاک‌سازی ناموفق بود'));$('#exportLogsBtn').onclick=()=>{navigator.clipboard?.writeText($('#consoleBox').textContent);toast(state.language==='en'?'Logs copied':'لاگ‌ها کپی شدند ✓')};window.biner.onCrash(d=>{toast(`Crash: ${d.message||'Minecraft خطا داد'}`);if(d.report)$('#consoleBox').textContent+=`\n[CRASH REPORT] ${d.report}`});$('#minimize').onclick=()=>window.biner.window.minimize();$('#maximize').onclick=()=>window.biner.window.maximize();$('#close').onclick=()=>window.biner.window.close();window.biner.onProgress(showProgress);window.biner.onLog(m=>{$('#consoleBox').textContent+=`\n${m}`;$('#consoleBox').scrollTop=$('#consoleBox').scrollHeight});window.biner.getProfile().then(p=>{if(p)state={...state,...p};if(state.fastMode===undefined)state.fastMode=true;if(state.language!=='en')state.language='fa';render();window.biner.appVersion().then(v=>{$('#launcherVersion').textContent=v;document.title=`Biner Launcher v${v}`});refreshServer()})
+(() => {
+  'use strict'
 
-// Biner Launcher bilingual interface: English + Persian, persisted with the launcher profile.
-const EN={
-'خانه':'Home','نسخه‌ها':'Versions','Instances':'Instances','Mod Loaders':'Mod Loaders','اخبار':'News','تنظیمات':'Settings','Developer':'Developer','JAVA RUNTIME':'JAVA RUNTIME','بازیکن مهمان':'Guest Player','حساب محلی • وارد نشده':'Local account • Not signed in','حساب محلی • آماده اجرا':'Local account • Ready','BINERCRAFT NETWORK':'BINERCRAFT NETWORK','OFFICIAL LAUNCHER':'OFFICIAL LAUNCHER','بازی شروع میشه.':'Game starts.','تو آماده‌ای؟':'Are you ready?','لانچر رسمی BinerCraft؛ سریع، تمیز و آماده برای اجرای Minecraft با Runtime خودکار و پروفایل‌های شخصی.':'The official BinerCraft launcher — fast, clean and ready for Minecraft with automatic runtime and personal profiles.','اجرای Minecraft':'Launch Minecraft','فروشگاه BinerCraft':'BinerCraft Store','SERVER PING':'SERVER PING','PLAYERS':'PLAYERS','VERSION':'VERSION','READY TO PLAY':'READY TO PLAY','Server':'Server','Java':'Java','RAM':'RAM','PLAY NOW':'PLAY NOW','انتخاب نسخه':'Choose Version','VERSION HUB':'VERSION HUB','نسخه‌ها مستقیماً از manifest رسمی Minecraft دریافت می‌شوند.':'Versions are fetched directly from the official Minecraft manifest.','RECOMMENDED':'RECOMMENDED','نسخه پیشنهادی برای تجربه پایدار BinerCraft':'Recommended for a stable BinerCraft experience','انتخاب این نسخه':'Select this version','جستجوی نسخه...':'Search versions...','بروزرسانی':'Refresh','Snapshot':'Snapshot','پروفایل‌های بازی':'Game Profiles','INSTANCE MANAGER':'INSTANCE MANAGER','برای هر سبک بازی تنظیمات جدا داشته باش.':'Keep separate settings for every play style.','پروفایل جدید':'New Profile','MODDING HUB':'MODDING HUB','لودر مناسب نسخه انتخاب‌شده را نصب و مدیریت کن.':'Install and manage the right loader for your selected version.','نصب Fabric':'Install Fabric','نصب Forge':'Install Forge','نصب NeoForge':'Install NeoForge','مدرن، سریع و مناسب مودهای نسل جدید Minecraft.':'Modern, fast and built for next-generation Minecraft mods.','سبک، سریع و مناسب اکثر مودهای مدرن.':'Lightweight, fast and ideal for most modern mods.','اکوسیستم بزرگ مودها با Installer واقعی.':'A huge mod ecosystem with a real installer.','در حال بررسی پروفایل‌های نصب‌شده...':'Checking installed profiles...','اخبار و بروزرسانی':'News & Updates','آخرین تغییرات لانچر و شبکه.':'Latest launcher and network updates.','مشاهده وضعیت سرور':'View server status','BinerLauncher وارد فاز Pro شد.':'BinerLauncher has entered the Pro phase.','مدیریت نسخه، Instances، تنظیمات پیشرفته، Runtime و ابزارهای توسعه در یک رابط یکپارچه.':'Version management, Instances, advanced settings, Runtime and developer tools in one unified interface.','سرور برای ورود آماده است.':'Server is ready to join.','Control Center':'Control Center','تنظیمات حرفه‌ای':'Advanced Settings','همه چیز برای اجرای بهتر Minecraft.':'Everything you need for a better Minecraft experience.','عمومی':'General','عملکرد':'Performance','Minecraft':'Minecraft','Launcher':'Launcher','پیشرفته':'Advanced','پروفایل و نمایش':'Profile & Display','GENERAL':'GENERAL','نام بازیکن':'Player Name','سرور':'Server','پورت':'Port','Preset رزولوشن':'Resolution Preset','عرض':'Width','ارتفاع':'Height','اجرای تمام‌صفحه':'Fullscreen','Performance':'Performance','RAM اختصاصی':'Dedicated RAM','RAM Preset':'RAM Preset','تنظیمات فعلی را مستقیماً اجرا کن.':'Launch with the current settings directly.','GAME CONFIG':'GAME CONFIG','باز کردن پوشه Minecraft':'Open Minecraft Folder','APPLICATION':'APPLICATION','بررسی بروزرسانی':'Check for Updates','JVM / DEBUG':'JVM / DEBUG','Developer Mode':'Developer Mode','ذخیره همه تنظیمات':'Save All Settings','عیب‌یابی، لاگ و مسیرهای فایل.':'Diagnostics, logs and file locations.','DevTools':'DevTools','Console':'Console','Minecraft':'Minecraft','Java Runtime':'Java Runtime','Clear Cache':'Clear Cache','Export Logs':'Export Logs','LOCAL':'LOCAL','Live Minecraft logs':'Live Minecraft logs','Open game folder':'Open game folder','Open runtime folder':'Open runtime folder','Remove launcher cache':'Remove launcher cache','Copy current console':'Copy current console','English':'English','فارسی':'Persian','زبان':'Language'};
-const FA={};Object.entries(EN).forEach(([fa,en])=>FA[en]=fa);
-function translateText(root,dict){if(!root)return;const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);nodes.forEach(n=>{const t=n.nodeValue.trim();if(dict[t])n.nodeValue=n.nodeValue.replace(t,dict[t])});root.querySelectorAll('input[placeholder],textarea[placeholder]').forEach(el=>{if(dict[el.placeholder])el.placeholder=dict[el.placeholder]})}
-function applyLanguage(){const en=state.language==='en';document.documentElement.lang=en?'en':'fa';document.documentElement.dir=en?'ltr':'rtl';translateText(document.body,en?EN:FA);const sel=$('#languageSelect');if(sel)sel.value=en?'en':'fa';const label=$('#languageLabel');if(label)label.textContent=en?'Language':'زبان'}
-function injectLanguageControl(){if($('#languageControl'))return;const panel=document.querySelector('.setting-panel[data-panel="launcher"]');if(!panel)return;const control=document.createElement('div');control.id='languageControl';control.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:14px;padding:13px 15px;border:1px solid var(--line);border-radius:14px;background:#ffffff04;';control.innerHTML='<div><b id="languageLabel">زبان</b><small style="display:block;color:#718199;margin-top:3px">Launcher interface language</small></div><select id="languageSelect" style="min-width:130px;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:#080f1c;color:#fff;outline:none"><option value="fa">فارسی</option><option value="en">English</option></select>';panel.appendChild(control);$('#languageSelect').onchange=async e=>{state.language=e.target.value;await persist();location.reload()};applyLanguage()}
-window.addEventListener('DOMContentLoaded',()=>{const timer=setInterval(()=>{if(document.querySelector('.setting-panel[data-panel="launcher"]')){clearInterval(timer);injectLanguageControl()}},50);setTimeout(()=>clearInterval(timer),10000)})
+  const $ = selector => document.querySelector(selector)
+  const $$ = selector => [...document.querySelectorAll(selector)]
+  const text = (selector, value) => { const el = $(selector); if (el) el.textContent = String(value ?? '') }
+  const on = (selector, event, handler) => { const el = $(selector); if (el) el.addEventListener(event, handler) }
+  const safe = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c])
+
+  const defaults = {
+    username: '', version: '1.21.11', memory: 4096, loader: 'vanilla', profileId: '',
+    serverHost: 'Play.BinerCraft.ir', serverPort: 25565, width: 1280, height: 720,
+    fullscreen: false, snapshots: false, developerMode: false, fastMode: true,
+    customArgs: [], language: 'fa'
+  }
+  let state = { ...defaults }
+  let versionFilter = 'release'
+
+  function toast(message) {
+    const el = $('#toast')
+    if (!el) return
+    el.textContent = String(message)
+    el.classList.add('show')
+    clearTimeout(window.__binerToastTimer)
+    window.__binerToastTimer = setTimeout(() => el.classList.remove('show'), 3000)
+  }
+
+  function setSection(id) {
+    $$('.nav-item').forEach(item => item.classList.toggle('active', item.dataset.section === id))
+    $$('.section').forEach(section => section.classList.toggle('hidden-section', section.id !== id))
+    if (id === 'versions') loadVersions()
+    if (id === 'instances') loadInstances()
+    if (id === 'modloaders') updateLoaderStatus()
+  }
+
+  async function saveProfile() {
+    const saved = await window.biner.saveProfile({ ...state })
+    state = { ...state, ...saved }
+    text('#saveState', 'SAVED')
+    return saved
+  }
+
+  function render() {
+    const name = state.username || (state.language === 'en' ? 'Guest Player' : 'بازیکن مهمان')
+    text('#username', name)
+    text('#avatar', name.charAt(0).toUpperCase() || 'G')
+    text('#accountStatus', state.username ? (state.language === 'en' ? 'Local account • Ready' : 'حساب محلی • آماده اجرا') : (state.language === 'en' ? 'Local account • Not signed in' : 'حساب محلی • وارد نشده'))
+    const values = {
+      '#nameInput': state.username, '#localNameInput': state.username, '#memoryInput': state.memory,
+      '#memorySlider': state.memory, '#serverInput': state.serverHost, '#portInput': state.serverPort,
+      '#widthInput': state.width, '#heightInput': state.height, '#jvmArgs': (state.customArgs || []).join(' ')
+    }
+    Object.entries(values).forEach(([selector, value]) => { const el = $(selector); if (el) el.value = value })
+    const checks = { '#fullscreenInput': state.fullscreen, '#snapshots': state.snapshots, '#developerToggle': state.developerMode, '#fastModeInput': state.fastMode !== false }
+    Object.entries(checks).forEach(([selector, value]) => { const el = $(selector); if (el) el.checked = Boolean(value) })
+    text('#ramValue', `${state.memory} MB`)
+    text('#memoryLabel', `${state.memory} MB`)
+    text('#selectedVersionLabel', state.version)
+    text('#selectedLoaderLabel', String(state.loader).toUpperCase())
+    text('#homeVersion', state.version)
+    text('#settingsVersion', state.version)
+    text('#settingsLoader', String(state.loader).toUpperCase())
+    text('#settingsJava', 'Auto Runtime')
+    text('#sideJava', 'AUTO')
+    text('#previewTitle', `${state.version} • ${state.loader === 'vanilla' ? 'Vanilla' : state.loader}`)
+    text('#playVersion', `${state.version} • ${state.loader === 'vanilla' ? 'Vanilla' : state.loader}`)
+    const fastStatus = $('#fastModeStatus'); if (fastStatus) fastStatus.textContent = state.fastMode === false ? 'OFF' : 'ON'
+    updateLoaderStatus()
+  }
+
+  function showProgress(data = {}) {
+    const overlay = $('#progressOverlay')
+    if (!overlay) return
+    overlay.classList.remove('hidden')
+    const percent = Math.max(0, Math.min(100, Number(data.progress) || 0))
+    text('#progressStage', String(data.stage || 'PREPARING').toUpperCase())
+    text('#progressPercent', `${percent}%`)
+    const bar = $('#progressBar'); if (bar) bar.style.width = `${percent}%`
+    text('#progressMessage', data.message || (state.language === 'en' ? 'Preparing...' : 'در حال آماده‌سازی...'))
+    text('#progressCurrent', data.current || 'BinerLauncher')
+    text('#progressBytes', data.received && data.total ? `${(data.received / 1048576).toFixed(1)} / ${(data.total / 1048576).toFixed(1)} MB` : '—')
+    if (data.stage === 'launched' || data.stage === 'closed') setTimeout(() => overlay.classList.add('hidden'), 1200)
+  }
+
+  async function launch() {
+    if (!state.username) {
+      $('#accountModal')?.classList.remove('hidden')
+      $('#localNameInput')?.focus()
+      return
+    }
+    const play = $('#playBtn'), preview = $('#previewPlay')
+    if (play) play.disabled = true
+    if (preview) preview.disabled = true
+    try {
+      await saveProfile()
+      await window.biner.launchMinecraft({ ...state, fastMode: state.fastMode !== false })
+    } catch (error) {
+      toast(`${state.language === 'en' ? 'Error' : 'خطا'}: ${error?.message || error}`)
+    } finally {
+      if (play) play.disabled = false
+      if (preview) preview.disabled = false
+    }
+  }
+
+  async function loginLocal() {
+    const input = $('#localNameInput')
+    const username = String(input?.value || '').trim()
+    if (!/^[A-Za-z0-9_]{3,16}$/.test(username)) {
+      toast(state.language === 'en' ? 'Username must be 3–16 characters.' : 'نام کاربری باید ۳ تا ۱۶ کاراکتر باشد.')
+      return
+    }
+    try {
+      const account = await window.biner.accounts.addLocal(username)
+      state.username = account.username
+      await saveProfile()
+      $('#accountModal')?.classList.add('hidden')
+      render()
+      toast(state.language === 'en' ? 'Local account added.' : 'حساب محلی اضافه شد.')
+    } catch (error) { toast(error?.message || String(error)) }
+  }
+
+  async function loadVersions() {
+    const box = $('#versionList')
+    if (!box) return
+    box.innerHTML = `<div class="loading">${state.language === 'en' ? 'Loading Minecraft versions...' : 'در حال دریافت نسخه‌های Minecraft...'}</div>`
+    try {
+      const list = await window.biner.getVersions(Boolean(state.snapshots))
+      const filtered = list.filter(v => versionFilter === 'all' || v.type === 'release')
+      text('#versionCount', filtered.length)
+      text('#featuredTitle', filtered[0]?.id || state.version)
+      box.innerHTML = filtered.map(v => `<button class="version-item ${v.id === state.version ? 'selected' : ''}" data-version="${safe(v.id)}"><b>${safe(v.id)}</b><small>${safe(String(v.type).toUpperCase())} • ${new Date(v.releaseTime).toLocaleDateString(state.language === 'en' ? 'en-US' : 'fa-IR')}</small>${v.id === state.version ? '<span class="badge">SELECTED</span>' : ''}</button>`).join('') || `<div class="loading">${state.language === 'en' ? 'No versions found.' : 'نسخه‌ای پیدا نشد.'}</div>`
+      $$('.version-item').forEach(button => button.addEventListener('click', () => selectVersion(button.dataset.version)))
+    } catch (error) {
+      box.innerHTML = `<div class="loading">${state.language === 'en' ? 'Version service unavailable:' : 'دریافت نسخه‌ها ناموفق بود:'} ${safe(error?.message || error)}</div>`
+    }
+  }
+
+  async function selectVersion(version) {
+    state.version = version
+    state.loader = 'vanilla'
+    state.profileId = ''
+    await saveProfile()
+    render()
+    await loadVersions()
+    toast(state.language === 'en' ? `Minecraft ${version} selected.` : `Minecraft ${version} انتخاب شد.`)
+  }
+
+  async function installLoader(loader) {
+    try {
+      toast(state.language === 'en' ? `Installing ${loader}...` : `در حال نصب ${loader}...`)
+      const result = await window.biner.installLoader({ loader, version: state.version })
+      state.loader = loader
+      state.profileId = result?.profileId || ''
+      await saveProfile()
+      render()
+      toast(state.language === 'en' ? `${loader} installed successfully.` : `${loader} با موفقیت نصب شد.`)
+    } catch (error) { toast(`${state.language === 'en' ? 'Error' : 'خطا'}: ${error?.message || error}`) }
+  }
+
+  async function loadInstances() {
+    const box = $('#instanceGrid')
+    if (!box || !window.binerCore?.instances) return
+    try {
+      const instances = await window.binerCore.instances.list()
+      if (!instances.length) {
+        box.innerHTML = `<div class="instance-card"><div class="instance-top"><div class="instance-icon">B</div><small>DEFAULT</small></div><h3>BinerCraft Main</h3><p>${state.language === 'en' ? 'Main launcher profile.' : 'پروفایل اصلی لانچر.'}</p><button class="primary" id="defaultInstance">${state.language === 'en' ? 'Use Main Profile' : 'استفاده از پروفایل اصلی'}</button></div>`
+        $('#defaultInstance')?.addEventListener('click', launch)
+        return
+      }
+      box.innerHTML = instances.map((item, index) => `<article class="instance-card"><div class="instance-top"><div class="instance-icon">${safe((item.name || item.id || 'B').charAt(0).toUpperCase())}</div><small>INSTANCE ${index + 1}</small></div><h3>${safe(item.name || item.id)}</h3><p>${safe(item.version || 'Unknown')} • ${safe(item.loader || 'vanilla')}</p><button class="primary" data-instance-launch="${safe(item.id)}">${state.language === 'en' ? 'Launch Profile' : 'اجرای پروفایل'}</button></article>`).join('')
+      $$('[data-instance-launch]').forEach(button => button.addEventListener('click', async () => {
+        const item = instances.find(x => x.id === button.dataset.instanceLaunch)
+        if (!item) return
+        state = { ...state, version: item.version || state.version, loader: item.loader || 'vanilla', memory: item.memory || state.memory }
+        render(); await launch()
+      }))
+    } catch (error) { box.innerHTML = `<div class="loading">${safe(error?.message || error)}</div>` }
+  }
+
+  function updateLoaderStatus() {
+    text('#installedLoaders', `${state.language === 'en' ? 'Active profile' : 'پروفایل فعال'}: ${String(state.loader).toUpperCase()} • ${state.version}`)
+  }
+
+  async function saveSettings() {
+    state = {
+      ...state,
+      username: String($('#nameInput')?.value || '').trim(),
+      memory: Number($('#memoryInput')?.value || state.memory),
+      serverHost: String($('#serverInput')?.value || '').trim() || 'Play.BinerCraft.ir',
+      serverPort: Number($('#portInput')?.value || 25565),
+      width: Number($('#widthInput')?.value || 1280), height: Number($('#heightInput')?.value || 720),
+      fullscreen: Boolean($('#fullscreenInput')?.checked), developerMode: Boolean($('#developerToggle')?.checked),
+      fastMode: $('#fastModeInput') ? Boolean($('#fastModeInput').checked) : state.fastMode,
+      customArgs: String($('#jvmArgs')?.value || '').split(/\s+/).filter(Boolean)
+    }
+    await saveProfile(); render(); toast(state.language === 'en' ? 'Settings saved.' : 'تنظیمات ذخیره شد.')
+  }
+
+  async function refreshServer() {
+    try {
+      const result = await window.biner.serverStatus({ host: state.serverHost, port: state.serverPort })
+      text('#homePing', result.online ? `${result.ping}ms` : 'OFFLINE')
+      text('#homePlayers', result.online ? 'ONLINE' : 'OFFLINE')
+      text('#topServerStatus', result.online ? 'ONLINE' : 'OFFLINE')
+      return result
+    } catch { return null }
+  }
+
+  function bindEvents() {
+    $$('.nav-item').forEach(item => item.addEventListener('click', () => setSection(item.dataset.section)))
+    on('#versionQuick', 'click', () => setSection('versions'))
+    on('#playBtn', 'click', launch); on('#previewPlay', 'click', launch)
+    on('#storeBtn', 'click', () => window.biner.openExternal('https://binercraft.ir'))
+    on('#accountBtn', 'click', () => $('#accountModal')?.classList.remove('hidden'))
+    on('#accountClose', 'click', () => $('#accountModal')?.classList.add('hidden'))
+    on('#localLogin', 'click', loginLocal)
+    on('#saveSettings', 'click', saveSettings)
+    on('#refreshVersions', 'click', loadVersions)
+    on('#featuredSelect', 'click', () => selectVersion($('#featuredTitle')?.textContent || state.version))
+    on('#openGameFolder', 'click', async () => window.biner.openFolder((await window.biner.folders()).root))
+    on('#gameFolderBtn', 'click', async () => window.biner.openFolder((await window.biner.folders()).root))
+    on('#runtimeFolderBtn', 'click', async () => window.biner.openFolder((await window.biner.folders()).runtime))
+    on('#clearCacheBtn', 'click', async () => toast(await window.biner.clearCache() ? 'Cache cleared.' : 'Cache cleanup failed.'))
+    on('#devtoolsBtn', 'click', () => window.biner.toggleDevTools(true))
+    on('#logsBtn', 'click', () => $('#consoleBox')?.scrollIntoView({ behavior: 'smooth' }))
+    on('#exportLogsBtn', 'click', async () => { try { await navigator.clipboard.writeText($('#consoleBox')?.textContent || ''); toast('Logs copied.') } catch { toast('Clipboard unavailable.') } })
+    on('#checkUpdates', 'click', async () => { const result = await window.biner.checkForUpdates(); if (result.update && result.url) { toast(`New version ${result.version} found.`); window.biner.openExternal(result.url) } else toast(result.error || 'You have the latest version.') })
+    on('#newsRefresh', 'click', async () => { const result = await refreshServer(); toast(result?.online ? `BinerCraft Online • ${result.ping}ms` : 'Server unavailable.') })
+    on('#newsServer', 'click', () => setSection('home'))
+    on('#snapshots', 'change', async event => { state.snapshots = event.target.checked; await saveProfile(); loadVersions() })
+    on('#versionSearch', 'input', event => $$('.version-item').forEach(item => { item.hidden = !item.dataset.version.toLowerCase().includes(event.target.value.toLowerCase()) }))
+    $$('.filter').forEach(button => button.addEventListener('click', () => { $$('.filter').forEach(x => x.classList.remove('active')); button.classList.add('active'); versionFilter = button.dataset.filter; loadVersions() }))
+    $$('.loader-install').forEach(button => button.addEventListener('click', () => installLoader(button.dataset.loader)))
+    on('#optifineImport', 'click', async () => { try { const result = await window.biner.importOptifine(); if (result) { state.loader = 'optifine'; state.profileId = ''; await saveProfile(); render(); toast('OptiFine imported.') } } catch (error) { toast(error?.message || String(error)) } })
+    $$('.setting-tab').forEach(button => button.addEventListener('click', () => { $$('.setting-tab').forEach(x => x.classList.remove('active')); $$('.setting-panel').forEach(x => x.classList.remove('active')); button.classList.add('active'); $(`.setting-panel[data-panel="${button.dataset.tab}"]`)?.classList.add('active') }))
+    on('#memorySlider', 'input', event => { const value = Number(event.target.value); if ($('#memoryInput')) $('#memoryInput').value = value; state.memory = value; text('#ramValue', `${value} MB`) })
+    on('#memoryInput', 'change', event => { const value = Number(event.target.value); state.memory = value; if ($('#memorySlider')) $('#memorySlider').value = value; text('#ramValue', `${value} MB`) })
+    on('#resolutionPreset', 'change', event => { if (event.target.value !== 'custom') { const [w, h] = event.target.value.split('x').map(Number); if ($('#widthInput')) $('#widthInput').value = w; if ($('#heightInput')) $('#heightInput').value = h } })
+    on('#newInstance', 'click', () => $('#instanceModal')?.classList.remove('hidden'))
+    on('#instanceClose', 'click', () => $('#instanceModal')?.classList.add('hidden'))
+    on('#createInstance', 'click', async () => { const name = String($('#instanceName')?.value || '').trim(); if (!name) return toast('Instance name is required.'); try { await window.binerCore.instances.create({ name, version: state.version, loader: state.loader, memory: state.memory }); $('#instanceName').value = ''; $('#instanceModal')?.classList.add('hidden'); await loadInstances(); toast('Instance created.') } catch (error) { toast(error?.message || String(error)) } })
+    on('#minimize', 'click', () => window.biner.window.minimize())
+    on('#maximize', 'click', () => window.biner.window.maximize())
+    on('#close', 'click', () => window.biner.window.close())
+    window.biner.onProgress(showProgress)
+    window.biner.onLog(message => { const box = $('#consoleBox'); if (!box) return; box.textContent += `\n${message}`; box.scrollTop = box.scrollHeight })
+    window.biner.onCrash(data => { toast(`Crash: ${data?.message || 'Minecraft error'}`); const box = $('#consoleBox'); if (box && data?.report) box.textContent += `\n[CRASH REPORT] ${data.report}` })
+  }
+
+  async function boot() {
+    bindEvents()
+    try {
+      const profile = await window.biner.getProfile()
+      if (profile) state = { ...state, ...profile }
+    } catch (error) { console.error('[BinerLauncher] profile load failed', error) }
+    render()
+    try {
+      const version = await window.biner.appVersion()
+      text('#launcherVersion', version)
+      document.title = `Biner Launcher v${version}`
+    } catch (error) { console.error('[BinerLauncher] version load failed', error) }
+    refreshServer()
+    loadVersions()
+    loadInstances()
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true })
+  else boot()
+})()
