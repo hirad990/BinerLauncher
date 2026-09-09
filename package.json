@@ -2,7 +2,7 @@
   "name": "biner-launcher",
   "version": "0.4.1",
   "description": "Official BinerCraft Minecraft Launcher",
-  "main": "src/boot.js",
+  "main": "src/main.js",
   "author": "BinerCraft",
   "license": "MIT",
   "private": true,
@@ -12,7 +12,7 @@
     "build": "npm run prepare-icon && electron-builder",
     "dist": "npm run prepare-icon && electron-builder --win",
     "prepare-icon": "node scripts/generate-icon.js",
-    "check": "node --check src/main.js && node --check src/boot.js && node --check src/preload.js && node --check src/biner-core.js && node --check src/download-manager.js && node --check src/java-manager.js && node --check src/loader-manager.js && node --check src/v040.js && node --check src/auto-updater.js && node --check src/renderer/app.js"
+    "check": "node --check src/main.js && node --check src/preload.js && node --check src/biner-core.js && node --check src/download-manager.js && node --check src/java-manager.js && node --check src/loader-manager.js && node --check src/v040.js && node --check src/auto-updater.js && node --check src/renderer/app.js"
   },
   "dependencies": {
     "minecraft-launcher-core": "^3.18.2",
