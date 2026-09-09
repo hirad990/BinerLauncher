@@ -23,12 +23,33 @@ contextBridge.exposeInMainWorld('biner', {
   window: { minimize: () => ipcRenderer.send('window:minimize'), maximize: () => ipcRenderer.send('window:maximize'), close: () => ipcRenderer.send('window:close') }
 })
 
-// Keep the loader hub in sync with the backend without requiring a renderer rewrite.
+// Keep the loader hub and performance controls usable even when the static renderer is unchanged.
 window.addEventListener('DOMContentLoaded', () => {
   const grid = document.querySelector('.loader-grid')
-  if (!grid || grid.querySelector('[data-loader="neoforge"]')) return
-  const card = document.createElement('article')
-  card.className = 'loader-card neoforge'
-  card.innerHTML = '<div class="loader-logo">N</div><b>NEOFORGE</b><h3>NeoForge</h3><p>مدرن، سریع و مناسب مودهای نسل جدید Minecraft.</p><button class="primary loader-install" data-loader="neoforge">نصب NeoForge</button>'
-  grid.appendChild(card)
+  if (grid && !grid.querySelector('[data-loader="neoforge"]')) {
+    const card = document.createElement('article')
+    card.className = 'loader-card neoforge'
+    card.innerHTML = '<div class="loader-logo">N</div><b>NEOFORGE</b><h3>NeoForge</h3><p>مدرن، سریع و مناسب مودهای نسل جدید Minecraft.</p><button class="primary loader-install" data-loader="neoforge">نصب NeoForge</button>'
+    grid.appendChild(card)
+  }
 })
+
+const fastModeObserver = new MutationObserver(() => {
+  const row = [...document.querySelectorAll('.toggle-row')].find(x => x.textContent.includes('Fast Launch'))
+  if (!row || document.querySelector('#fastModeInput')) return
+  const status = row.querySelector('.enabled')
+  if (status) { status.id = 'fastModeStatus' }
+  const input = document.createElement('input')
+  input.type = 'checkbox'
+  input.id = 'fastModeInput'
+  input.style.cssText = 'width:18px;height:18px;cursor:pointer;accent-color:#7c5cff;margin-inline-start:12px;'
+  row.appendChild(input)
+  ipcRenderer.invoke('profile:get').then(profile => { input.checked = profile?.fastMode !== false; if (status) status.textContent = input.checked ? 'ON' : 'OFF' })
+  input.addEventListener('change', async () => {
+    const profile = await ipcRenderer.invoke('profile:get') || {}
+    profile.fastMode = input.checked
+    await ipcRenderer.invoke('profile:save', profile)
+    if (status) status.textContent = input.checked ? 'ON' : 'OFF'
+  })
+})
+fastModeObserver.observe(document.documentElement, { childList: true, subtree: true })
