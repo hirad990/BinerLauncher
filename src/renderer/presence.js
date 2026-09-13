@@ -31,6 +31,36 @@
 
   const installationId = getInstallationId()
 
+  // Independent navigation fallback: navbar must remain usable even if another
+  // renderer initialization task is slow or fails.
+  const installNavigationFallback = () => {
+    const bind = () => {
+      document.querySelectorAll('.nav-item').forEach(item => {
+        if (item.dataset.binerNavBound === '1') return
+        item.dataset.binerNavBound = '1'
+        item.addEventListener('click', event => {
+          event.preventDefault()
+          event.stopPropagation()
+          const id = item.dataset.section
+          if (!id) return
+
+          document.querySelectorAll('.nav-item').forEach(x => x.classList.toggle('active', x === item))
+          document.querySelectorAll('.section').forEach(section => {
+            section.classList.toggle('hidden-section', section.id !== id)
+          })
+
+          const content = document.querySelector('.content')
+          if (content) content.scrollTop = 0
+
+          window.dispatchEvent(new CustomEvent('biner:navigate', { detail: { section: id } }))
+        }, true)
+      })
+    }
+
+    bind()
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind, { once: true })
+  }
+
   const injectUI = () => {
     const metrics = document.querySelector('.metrics')
     if (!metrics || document.getElementById('launcherUsersMetric')) return Boolean(metrics)
@@ -114,6 +144,7 @@
   }
 
   const start = () => {
+    installNavigationFallback()
     if (!injectUI()) {
       requestAnimationFrame(start)
       return
