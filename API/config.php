@@ -10,7 +10,7 @@ const DB_PASS = 'YOUR_DATABASE_PASSWORD';
 const DB_CHARSET = 'utf8mb4';
 
 const API_CORS_ORIGIN = '*';
-const ONLINE_WINDOW_SECONDS = 90;
+const ONLINE_WINDOW_SECONDS = 20;
 const MAX_HEARTBEAT_BODY_BYTES = 4096;
 
 function db(): PDO
