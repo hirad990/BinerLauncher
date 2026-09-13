@@ -31,6 +31,20 @@
 
   const installationId = getInstallationId()
 
+  const loadProfessionalUI = () => {
+    try {
+      if (document.querySelector('script[data-biner-professional]')) return
+      const script = document.createElement('script')
+      script.src = './professional.js'
+      script.dataset.binerProfessional = '1'
+      script.async = false
+      script.onerror = () => console.warn('[BinerLauncher] professional.js unavailable')
+      ;(document.head || document.documentElement).appendChild(script)
+    } catch (error) {
+      console.warn('[BinerLauncher] professional UI loader failed', error)
+    }
+  }
+
   // Keep navigation usable even if the async renderer initialization is slow.
   const installNavigationFallback = () => {
     const bind = () => {
@@ -135,6 +149,7 @@
 
   const start = () => {
     try {
+      loadProfessionalUI()
       installNavigationFallback()
       injectUI()
       heartbeat().catch(() => {})
