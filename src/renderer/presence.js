@@ -1,10 +1,6 @@
 (() => {
   'use strict'
 
-  // IMPORTANT: this module is intentionally isolated from the launcher core.
-  // Presence/API failures must NEVER affect navigation, Minecraft launching,
-  // settings, window controls, or any other renderer functionality.
-
   const API = 'https://binercraft.ir/launchAPI'
   const HEARTBEAT_MS = 10000
   const ANIMATION_MS = 2600
@@ -35,19 +31,38 @@
 
   const installationId = getInstallationId()
 
-  // Presence has its own UI. It does not bind to launcher navigation or
-  // window controls and does not call anything from window.biner.
+  // Keep navigation usable even if the async renderer initialization is slow.
+  const installNavigationFallback = () => {
+    const bind = () => {
+      document.querySelectorAll('.nav-item').forEach(item => {
+        if (item.dataset.binerNavBound === '1') return
+        item.dataset.binerNavBound = '1'
+        item.addEventListener('click', event => {
+          event.preventDefault()
+          event.stopPropagation()
+          const id = item.dataset.section
+          if (!id) return
+          document.querySelectorAll('.nav-item').forEach(x => x.classList.toggle('active', x === item))
+          document.querySelectorAll('.section').forEach(section => section.classList.toggle('hidden-section', section.id !== id))
+          const content = document.querySelector('.content')
+          if (content) content.scrollTop = 0
+          window.dispatchEvent(new CustomEvent('biner:navigate', { detail: { section: id } }))
+        }, true)
+      })
+    }
+    bind()
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind, { once: true })
+  }
+
   const injectUI = () => {
     try {
       const metrics = document.querySelector('.metrics')
       if (!metrics || document.getElementById('launcherUsersMetric')) return Boolean(metrics)
-
       const card = document.createElement('div')
       card.id = 'launcherUsersMetric'
       card.className = 'launcher-presence-metric'
       card.innerHTML = '<strong id="launcherUsers">—</strong><small>LAUNCHER USERS</small><span id="launcherPresenceChange" class="launcher-presence-change"></span>'
       metrics.appendChild(card)
-
       const style = document.createElement('style')
       style.id = 'launcherPresenceStyles'
       style.textContent = `
@@ -63,10 +78,7 @@
       `
       document.head.appendChild(style)
       return true
-    } catch {
-      // Presence UI is optional. Never propagate its failure to the launcher.
-      return false
-    }
+    } catch { return false }
   }
 
   const showChange = (online, previous) => {
@@ -93,32 +105,19 @@
     } catch {}
   }
 
-  const payload = () => JSON.stringify({
-    installationId,
-    launcherVersion: '1.1.0',
-    platform: 'windows'
-  })
+  const payload = () => JSON.stringify({ installationId, launcherVersion: '1.1.0', platform: 'windows' })
 
   const heartbeat = async () => {
     if (!active) return
     try {
-      const response = await fetch(`${API}/heartbeat.php`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: payload(),
-        cache: 'no-store'
-      })
+      const response = await fetch(`${API}/heartbeat.php`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: payload(), cache: 'no-store' })
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const data = await response.json()
       if (data?.ok) render(data.online)
       else throw new Error(data?.error || 'heartbeat_failed')
     } catch {
-      // Server/API failure only disables the counter. The launcher continues normally.
       try {
-        const response = await fetch(`${API}/online.php?t=${Date.now()}`, {
-          cache: 'no-store',
-          headers: { 'Accept': 'application/json' }
-        })
+        const response = await fetch(`${API}/online.php?t=${Date.now()}`, { cache: 'no-store', headers: { 'Accept': 'application/json' } })
         const data = await response.json()
         if (data?.ok) render(data.online)
       } catch {}
@@ -135,27 +134,21 @@
   }
 
   const start = () => {
-    // Everything below is best-effort and fully isolated from the core launcher.
     try {
-      if (!injectUI()) return
+      installNavigationFallback()
+      injectUI()
       heartbeat().catch(() => {})
       timer = setInterval(() => heartbeat().catch(() => {}), HEARTBEAT_MS)
       window.addEventListener('beforeunload', leave, { once: true })
       window.addEventListener('pagehide', leave, { once: true })
     } catch {
-      // A broken presence system must be a silent no-op.
       if (timer) clearInterval(timer)
       timer = null
     }
   }
 
   try {
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', start, { once: true })
-    } else {
-      start()
-    }
-  } catch {
-    // Intentionally empty: presence must never crash the launcher.
-  }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true })
+    else start()
+  } catch {}
 })()
